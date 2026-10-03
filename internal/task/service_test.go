@@ -354,7 +354,7 @@ func TestUpdateTask_Success(t *testing.T) {
 	mockProject := db.Project{ID: projectID, OwnerID: userID}
 
 	newTitle := "Updated title"
-	newStatus := "done"
+	newStatus := "completed"
 	req := UpdateTaskRequest{
 		Title: newTitle,
 		Status: newStatus,

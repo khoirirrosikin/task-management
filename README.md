@@ -173,11 +173,11 @@ erDiagram
     TASKS {
         uuid id PK
         uuid project_id FK
-        string title
+        varchar title
         text description
-        varchar status "todo | in_progress | done"
-        varchar priority "low | medium | high"
-        uuid assignee_id FK
+        varchar status "todo | in_progress | completed"
+        varchar priority "low | medium | high | urgent"
+        uuid assigned_to FK
         timestamptz due_date
         timestamptz created_at
         timestamptz updated_at
