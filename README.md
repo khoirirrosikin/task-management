@@ -61,7 +61,12 @@ task-management/
 │   │   ├── repository_test.go      # Unit tests for database repository with pgxmock
 │   │   ├── service.go              # Business logic & authorization checks
 │   │   └── service_test.go         # Unit tests with mock repository
-│   ├── task/                       # Task management module (Upcoming)
+│   ├── task/                       # Task management module
+│   │   ├── dto.go                  # Request/Response data transfer objects
+│   │   ├── handler.go              # Gin HTTP handlers (Shallow nesting)
+│   │   ├── repository.go           # Database operations interface & implementation
+│   │   ├── service.go              # Business logic & access verification
+│   │   └── service_test.go         # Unit tests with mock repositories
 │   ├── middleware/                 # Shared middlewares (Auth JWT, CORS, Logger)
 │   │   ├── auth.go                 # JWT authentication middleware
 │   │   └── auth_test.go            # Unit tests for JWT auth middleware
@@ -75,14 +80,17 @@ task-management/
 │           ├── db.go
 │           ├── models.go
 │           ├── users.sql.go
-│           └── projects.sql.go
+│           ├── projects.sql.go
+│           └── tasks.sql.go
 ├── sql/
 │   ├── migrations/                 # Versioned DDL migrations for goose
 │   │   ├── 00001_create_users_table.sql
-│   │   └── 00002_create_projects_table.sql
+│   │   ├── 00002_create_projects_table.sql
+│   │   └── 00003_create_tasks_table.sql
 │   └── queries/                    # Raw SQL queries for sqlc
 │       ├── users.sql
-│       └── projects.sql
+│       ├── projects.sql
+│       └── tasks.sql
 ├── docker-compose.yml              # Local PostgreSQL container definition
 ├── sqlc.yaml                       # sqlc code generation configuration
 ├── go.mod
@@ -106,7 +114,9 @@ task-management/
 - [x] JWT Authentication Middleware
 - [x] Centralized AppError & Error Handling
 - [x] CRUD Project (Create, List, Detail, Update, Delete)
-- [ ] CRUD Task (Title, Description, Status, Due Date, Priority)
+- [x] CRUD Task (Title, Description, Status, Due Date, Priority)
+- [x] Unit test suite for Task Service (100% Mock-driven)
+- [ ] Unit test suite for Task Handler & Repository
 
 ### Phase 2 — Collaboration & RBAC
 - [ ] Project member invitation (via email/username)
@@ -241,12 +251,14 @@ Run unit tests for specific modules:
 ```bash
 go test -v ./internal/auth
 go test -v ./internal/project
+go test -v ./internal/task
 ```
 
 Check test code coverage:
 ```bash
 go test -cover ./internal/auth
 go test -cover ./internal/project
+go test -cover ./internal/task
 ```
 
 ---
@@ -416,6 +428,129 @@ go test -cover ./internal/project
 {
   "success": true,
   "message": "Project deleted successfully"
+}
+```
+
+### Create Task
+- **Endpoint:** `POST /api/v1/projects/:projectId/tasks`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "title": "Setup database migrations",
+  "description": "Create goose migration files for tasks table",
+  "status": "todo",
+  "priority": "high",
+  "assigned_to": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+  "due_date": "2026-10-10T12:00:00Z"
+}
+```
+- **Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "Task created successfully",
+  "data": {
+    "id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+    "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+    "title": "Setup database migrations",
+    "description": "Create goose migration files for tasks table",
+    "status": "todo",
+    "priority": "high",
+    "assigned_to": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+    "due_date": "2026-10-10T12:00:00Z",
+    "created_at": "2026-10-03T12:00:00Z",
+    "updated_at": "2026-10-03T12:00:00Z"
+  }
+}
+```
+
+### List Tasks by Project
+- **Endpoint:** `GET /api/v1/projects/:projectId/tasks`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Tasks retrieved successfully",
+  "data": [
+    {
+      "id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+      "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+      "title": "Setup database migrations",
+      "description": "Create goose migration files for tasks table",
+      "status": "todo",
+      "priority": "high",
+      "assigned_to": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+      "due_date": "2026-10-10T12:00:00Z",
+      "created_at": "2026-10-03T12:00:00Z",
+      "updated_at": "2026-10-03T12:00:00Z"
+    }
+  ]
+}
+```
+
+### Get Task Details
+- **Endpoint:** `GET /api/v1/tasks/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Task retrieved successfully",
+  "data": {
+    "id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+    "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+    "title": "Setup database migrations",
+    "description": "Create goose migration files for tasks table",
+    "status": "todo",
+    "priority": "high",
+    "assigned_to": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+    "due_date": "2026-10-10T12:00:00Z",
+    "created_at": "2026-10-03T12:00:00Z",
+    "updated_at": "2026-10-03T12:00:00Z"
+  }
+}
+```
+
+### Update Task
+- **Endpoint:** `PUT /api/v1/tasks/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "status": "in_progress",
+  "priority": "medium"
+}
+```
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Task updated successfully",
+  "data": {
+    "id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+    "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+    "title": "Setup database migrations",
+    "description": "Create goose migration files for tasks table",
+    "status": "in_progress",
+    "priority": "medium",
+    "assigned_to": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+    "due_date": "2026-10-10T12:00:00Z",
+    "created_at": "2026-10-03T12:00:00Z",
+    "updated_at": "2026-10-03T12:30:00Z"
+  }
+}
+```
+
+### Delete Task
+- **Endpoint:** `DELETE /api/v1/tasks/:id`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Task deleted successfully"
 }
 ```
 

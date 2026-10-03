@@ -17,6 +17,7 @@ import (
 	"github.com/khoirirrosikin/task-management/internal/database/db"
 	"github.com/khoirirrosikin/task-management/internal/middleware"
 	"github.com/khoirirrosikin/task-management/internal/project"
+	"github.com/khoirirrosikin/task-management/internal/task"
 )
 
 func main() {
@@ -47,6 +48,10 @@ func main() {
 	projectService := project.NewService(projectRepo)
 	projectHandler := project.NewHandler(projectService)
 
+	taskRepo := task.NewRepository(queries)
+	taskService := task.NewService(taskRepo, projectRepo)
+	taskHandler := task.NewHandler(taskService)
+
 	authMiddleware := middleware.AuthMiddleware(jwtSecret)
 
 	router := gin.Default()
@@ -58,6 +63,7 @@ func main() {
 	v1 := router.Group("/api/v1")
 	authHandler.RegisterRoutes(v1)
 	projectHandler.RegisterRoutes(v1, authMiddleware)
+	taskHandler.RegisterRoutes(v1, authMiddleware)
 
 	srv := &http.Server{
 		Addr: ":" + port,
