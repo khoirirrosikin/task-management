@@ -64,6 +64,7 @@ task-management/
 │   ├── task/                       # Task management module
 │   │   ├── dto.go                  # Request/Response data transfer objects
 │   │   ├── handler.go              # Gin HTTP handlers (Shallow nesting)
+│   │   ├── handler_test.go         # Unit tests for HTTP handlers
 │   │   ├── repository.go           # Database operations interface & implementation
 │   │   ├── service.go              # Business logic & access verification
 │   │   └── service_test.go         # Unit tests with mock repositories
@@ -115,8 +116,8 @@ task-management/
 - [x] Centralized AppError & Error Handling
 - [x] CRUD Project (Create, List, Detail, Update, Delete)
 - [x] CRUD Task (Title, Description, Status, Due Date, Priority)
-- [x] Unit test suite for Task Service (100% Mock-driven)
-- [ ] Unit test suite for Task Handler & Repository
+- [x] Unit test suite for Task Service & Handler (100% Mock-driven, 84%+ coverage)
+- [ ] Unit test suite for Task Repository with `pgxmock`
 
 ### Phase 2 — Collaboration & RBAC
 - [ ] Project member invitation (via email/username)
