@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
-	"github.com/khoirirrosikin/task-management/internal/project"
 	"github.com/khoirirrosikin/task-management/internal/response"
 )
 
@@ -20,12 +19,16 @@ type Service interface {
 	DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 }
 
-type service struct {
-	repo Repository
-	projectRepo project.Repository
+type ProjectRepository interface {
+	GetProjectByID(ctx context.Context, id uuid.UUID) (db.Project, error)
 }
 
-func NewService(repo Repository, projectRepo project.Repository) Service {
+type service struct {
+	repo Repository
+	projectRepo ProjectRepository
+}
+
+func NewService(repo Repository, projectRepo ProjectRepository) Service {
 	return &service{
 		repo: repo,
 		projectRepo: projectRepo,

@@ -57,6 +57,35 @@ func (m *MockService) DeleteProject(ctx context.Context, projectID uuid.UUID, ow
 	return args.Error(0)
 }
 
+func (m *MockService) AddMember(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, req AddMemberRequest) (*MemberResponse, error) {
+	args := m.Called(ctx, projectID, ownerID, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*MemberResponse), args.Error(1)
+}
+
+func (m *MockService) ListMembers(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]MemberResponse, error) {
+	args := m.Called(ctx, projectID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]MemberResponse), args.Error(1)
+}
+
+func (m *MockService) RemoveMember(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, memberID uuid.UUID) error {
+	args := m.Called(ctx, projectID, ownerID, memberID)
+	return args.Error(0)
+}
+
+func (m *MockService) UpdateMemberRole(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, memberID uuid.UUID, req UpdateMemberRoleRequest) (*MemberResponse, error) {
+	args := m.Called(ctx, projectID, ownerID, memberID, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*MemberResponse), args.Error(1)
+}
+
 func setupTestRouter(service Service, testUserID uuid.UUID) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
@@ -84,7 +113,7 @@ func performRequest(r http.Handler, method, path string, body any) *httptest.Res
 			bodyReader = bytes.NewBuffer(jsonBytes)
 		}
 	}
-	
+
 	req, _ := http.NewRequest(method, path, bodyReader)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -100,17 +129,17 @@ func TestHandler_CreateProject_Success(t *testing.T) {
 	router := setupTestRouter(mockService, testUserID)
 
 	reqBody := CreateProjectRequest{
-		Name: "Test project",
+		Name:        "Test project",
 		Description: "Test project description",
 	}
 
 	expectedRes := &ProjectResponse{
-		ID: uuid.New().String(),
-		Name: reqBody.Name,
+		ID:          uuid.New().String(),
+		Name:        reqBody.Name,
 		Description: reqBody.Description,
-		OwnerID: testUserID.String(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		OwnerID:     testUserID.String(),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	mockService.On("CreateProject", mock.Anything, testUserID, reqBody).
@@ -156,13 +185,13 @@ func TestHandler_ListProjects_Success(t *testing.T) {
 
 	expectedRes := []ProjectResponse{
 		{
-			ID: uuid.New().String(),
-			Name: "Test project 1",
+			ID:          uuid.New().String(),
+			Name:        "Test project 1",
 			Description: "Test description 1",
 		},
 		{
-			ID: uuid.New().String(),
-			Name: "Test project 2",
+			ID:          uuid.New().String(),
+			Name:        "Test project 2",
 			Description: "Test description 2",
 		},
 	}
@@ -179,7 +208,7 @@ func TestHandler_ListProjects_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, res.Success)
 	assert.Len(t, res.Data, len(expectedRes))
-	
+
 	mockService.AssertExpectations(t)
 }
 
@@ -190,16 +219,16 @@ func TestHandler_GetProjectByID_Success(t *testing.T) {
 	router := setupTestRouter(mockService, testUserID)
 
 	expectedRes := &ProjectResponse{
-		ID: projectID.String(),
-		Name: "Test project",
+		ID:          projectID.String(),
+		Name:        "Test project",
 		Description: "Test project description",
-		OwnerID: testUserID.String(),
+		OwnerID:     testUserID.String(),
 	}
 
 	mockService.On("GetProjectByID", mock.Anything, projectID, testUserID).
 		Return(expectedRes, nil)
 
-	w := performRequest(router, http.MethodGet, "/api/v1/projects/" + projectID.String(), nil)
+	w := performRequest(router, http.MethodGet, "/api/v1/projects/"+projectID.String(), nil)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -221,7 +250,7 @@ func TestHandler_GetProjectByID_NotFound(t *testing.T) {
 	mockService.On("GetProjectByID", mock.Anything, projectID, testUserID).
 		Return(nil, response.ErrNotFound("Project not found"))
 
-	w := performRequest(router, http.MethodGet, "/api/v1/projects/" + projectID.String(), nil)
+	w := performRequest(router, http.MethodGet, "/api/v1/projects/"+projectID.String(), nil)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 
@@ -242,7 +271,7 @@ func TestHandler_GetProjectByID_Unauthorized(t *testing.T) {
 	mockService.On("GetProjectByID", mock.Anything, projectID, testUserID).
 		Return(nil, response.ErrUnauthorized("Unauthorized to access this project"))
 
-	w := performRequest(router, http.MethodGet, "/api/v1/projects/" + projectID.String(), nil)
+	w := performRequest(router, http.MethodGet, "/api/v1/projects/"+projectID.String(), nil)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
@@ -261,23 +290,23 @@ func TestHandler_UpdateProject_Success(t *testing.T) {
 	router := setupTestRouter(mockService, testUserID)
 
 	reqBody := UpdateProjectRequest{
-		Name: "Test project updated",
+		Name:        "Test project updated",
 		Description: "Test project description updated",
 	}
 
 	expectedRes := &ProjectResponse{
-		ID: projectID.String(),
-		Name: reqBody.Name,
+		ID:          projectID.String(),
+		Name:        reqBody.Name,
 		Description: reqBody.Description,
-		OwnerID: testUserID.String(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		OwnerID:     testUserID.String(),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	mockService.On("UpdateProject", mock.Anything, projectID, testUserID, reqBody).
 		Return(expectedRes, nil)
 
-	w := performRequest(router, http.MethodPut, "/api/v1/projects/" + projectID.String(), reqBody)
+	w := performRequest(router, http.MethodPut, "/api/v1/projects/"+projectID.String(), reqBody)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -299,7 +328,7 @@ func TestHandler_DeleteProject_Success(t *testing.T) {
 	mockService.On("DeleteProject", mock.Anything, projectID, testUserID).
 		Return(nil)
 
-	w := performRequest(router, http.MethodDelete, "/api/v1/projects/" + projectID.String(), nil)
+	w := performRequest(router, http.MethodDelete, "/api/v1/projects/"+projectID.String(), nil)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -320,7 +349,7 @@ func TestHandler_DeleteProject_Unauthorized(t *testing.T) {
 	mockService.On("DeleteProject", mock.Anything, projectID, testUserID).
 		Return(response.ErrUnauthorized("Unauthorized to access this project"))
 
-	w := performRequest(router, http.MethodDelete, "/api/v1/projects/" + projectID.String(), nil)
+	w := performRequest(router, http.MethodDelete, "/api/v1/projects/"+projectID.String(), nil)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
@@ -331,4 +360,3 @@ func TestHandler_DeleteProject_Unauthorized(t *testing.T) {
 	assert.Equal(t, "Unauthorized to access this project", res.Message)
 	mockService.AssertExpectations(t)
 }
-

@@ -44,6 +44,36 @@ func (m *MockRepository) DeleteProject(ctx context.Context, arg db.DeleteProject
 	return args.Error(0)
 }
 
+func (m *MockRepository) AddProjectMember(ctx context.Context, arg db.AddProjectMemberParams) (db.ProjectMember, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ProjectMember), args.Error(1)
+}
+
+func (m *MockRepository) GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ProjectMember), args.Error(1)
+}
+
+func (m *MockRepository) ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]db.ListProjectMembersRow, error) {
+	args := m.Called(ctx, projectID)
+	return args.Get(0).([]db.ListProjectMembersRow), args.Error(1)
+}
+
+func (m *MockRepository) RemoveProjectMember(ctx context.Context, arg db.RemoveProjectMemberParams) error {
+	args := m.Called(ctx, arg)
+	return args.Error(0)
+}
+
+func (m *MockRepository) UpdateProjectMemberRole(ctx context.Context, arg db.UpdateProjectMemberRoleParams) (db.ProjectMember, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.ProjectMember), args.Error(1)
+}
+
+func (m *MockRepository) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
+	args := m.Called(ctx, email)
+	return args.Get(0).(db.User), args.Error(1)
+}
+
 func TestCreateProject_Success(t *testing.T) {
 	mockRepo := new(MockRepository)
 	service := NewService(mockRepo)

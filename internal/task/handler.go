@@ -19,7 +19,7 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	projectTasks := rg.Group("/projects/:projectId/tasks")
+	projectTasks := rg.Group("/projects/:id/tasks")
 	projectTasks.Use(authMiddleware)
 	{
 		projectTasks.POST("", h.CreateTask)
@@ -36,7 +36,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 }
 
 func (h *Handler) CreateTask(c *gin.Context) {
-	projectID, err := uuid.Parse(c.Param("projectId"))
+	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid project ID", nil)
 		return
@@ -60,7 +60,7 @@ func (h *Handler) CreateTask(c *gin.Context) {
 }
 
 func (h *Handler) ListTasks(c *gin.Context) {
-	projectID, err := uuid.Parse(c.Param("projectId"))
+	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Invalid project ID", nil)
 		return

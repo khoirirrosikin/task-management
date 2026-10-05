@@ -1,0 +1,209 @@
+### =========================================================================
+### Task Management API — HTTP Client Test Scenarios
+### =========================================================================
+
+@baseUrl = http://localhost:8080/api/v1
+@contentType = application/json
+
+### 1. HEALTH CHECK
+GET http://localhost:8080/health
+Content-Type: {{contentType}}
+
+
+### =========================================================================
+### 2. AUTHENTICATION MODULE
+### =========================================================================
+
+### 2.1. Register User (Success)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Khoirir Rosikin",
+  "email": "khoirir.rosikin@gmail.com",
+  "password": "secretpassword123"
+}
+
+### 2.2. Register User (Duplicate Email - Expected 409 Conflict)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Khoirir Rosikin",
+  "email": "khoirir.rosikin@gmail.com",
+  "password": "secretpassword123"
+}
+
+### 2.3. Login User (Success)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "khoirir.rosikin@gmail.com",
+  "password": "secretpassword123"
+}
+
+### Ambil token dari response login di atas
+@authToken = {{login.response.body.data.token}}
+
+### 2.4. Login User (Wrong Password - Expected 401 Unauthorized)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "khoirir.rosikin@gmail.com",
+  "password": "wrongpassword"
+}
+
+
+### =========================================================================
+### 3. PROJECT MODULE
+### =========================================================================
+
+### 3.1. Create Project (Success)
+# @name createProject
+POST {{baseUrl}}/projects
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Task Management Project",
+  "description": "Building a robust Task Management API with Go and PostgreSQL"
+}
+
+### Ambil ID project yang baru dibuat
+@projectId = {{createProject.response.body.data.id}}
+
+### 3.2. Create Project (Validation Error - Expected 400 Bad Request)
+POST {{baseUrl}}/projects
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "name": ""
+}
+
+### 3.3. List Projects (Success)
+GET {{baseUrl}}/projects
+Authorization: Bearer {{authToken}}
+
+### 3.4. Get Project by ID (Success)
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{authToken}}
+
+### 3.5. Update Project (Success)
+PUT {{baseUrl}}/projects/{{projectId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Task Management API (Updated)",
+  "description": "Updated project description with complete features"
+}
+
+
+### =========================================================================
+### 4. TASK MODULE
+### =========================================================================
+
+### 4.1. Create Task 1 - Todo / High Priority (Success)
+# @name createTask1
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Design Database Schema",
+  "description": "Create goose migrations for users, projects, and tasks",
+  "status": "todo",
+  "priority": "high",
+  "due_date": "2026-10-15T18:00:00Z"
+}
+
+### Ambil Task ID yang baru dibuat
+@taskId = {{createTask1.response.body.data.id}}
+
+### 4.2. Create Task 2 - In Progress / Medium Priority
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Implement Unit Tests",
+  "description": "Write service and handler unit tests with testify/mock",
+  "status": "in_progress",
+  "priority": "medium"
+}
+
+### 4.3. Create Task (Validation Error - Title Terlalu Pendek / Kosong)
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "A",
+  "status": "todo"
+}
+
+### 4.4. List Tasks by Project (Success)
+GET {{baseUrl}}/projects/{{projectId}}/tasks
+Authorization: Bearer {{authToken}}
+
+### 4.5. Get Task by ID (Success)
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+
+### 4.6. Update Task - Ubah Status ke Completed (Success)
+PUT {{baseUrl}}/tasks/{{taskId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Design Database Schema (Done)",
+  "status": "completed",
+  "priority": "urgent"
+}
+
+### 4.7. Update Task (Validation Error - Status Tidak Valid)
+PUT {{baseUrl}}/tasks/{{taskId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "status": "pending_approval"
+}
+
+### 4.8. Delete Task (Success)
+DELETE {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+
+### 4.9. Get Deleted Task (Expected 404 Not Found)
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{authToken}}
+
+
+### =========================================================================
+### 5. CLEANUP / DELETE PROJECT
+### =========================================================================
+
+### 5.1. Delete Project (Success)
+DELETE {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{authToken}}
+
+### 5.2. Get Deleted Project (Expected 404 Not Found)
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{authToken}}
+
+
+### =========================================================================
+### 6. SECURITY & UNAUTHORIZED SCENARIOS
+### =========================================================================
+
+### 6.1. Access Protected Route Without Token (Expected 401 Unauthorized)
+GET {{baseUrl}}/projects
+
+### 6.2. Access Protected Route With Invalid/Tampered Token (Expected 401)
+GET {{baseUrl}}/projects
+Authorization: Bearer invalid_jwt_token_here

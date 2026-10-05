@@ -13,6 +13,14 @@ type Repository interface {
 	ListProjectsByOwner(ctx context.Context, ownerID uuid.UUID) ([]db.Project, error)
 	UpdateProject(ctx context.Context, arg db.UpdateProjectParams) (db.Project, error)
 	DeleteProject(ctx context.Context, arg db.DeleteProjectParams) error
+
+	AddProjectMember(ctx context.Context, arg db.AddProjectMemberParams) (db.ProjectMember, error)
+	GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error)
+	ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]db.ListProjectMembersRow, error)
+	RemoveProjectMember(ctx context.Context, arg db.RemoveProjectMemberParams) error
+	UpdateProjectMemberRole(ctx context.Context, arg db.UpdateProjectMemberRoleParams) (db.ProjectMember, error)
+	GetUserByEmail(ctx context.Context, email string) (db.User, error)
+
 }
 
 type repository struct {
@@ -43,4 +51,28 @@ func (r *repository) UpdateProject(ctx context.Context, arg db.UpdateProjectPara
 
 func (r *repository) DeleteProject(ctx context.Context, arg db.DeleteProjectParams) error {
 	return r.queries.DeleteProject(ctx, arg)
+}
+
+func (r *repository) AddProjectMember(ctx context.Context, arg db.AddProjectMemberParams) (db.ProjectMember, error) {
+	return r.queries.AddProjectMember(ctx, arg)
+}
+
+func (r *repository) GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error) {
+	return r.queries.GetProjectMember(ctx, arg)
+}
+
+func (r *repository) ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]db.ListProjectMembersRow, error) {
+	return r.queries.ListProjectMembers(ctx, projectID)
+}
+
+func (r *repository) RemoveProjectMember(ctx context.Context, arg db.RemoveProjectMemberParams) error {
+	return r.queries.RemoveProjectMember(ctx, arg)
+}
+
+func (r *repository) UpdateProjectMemberRole(ctx context.Context, arg db.UpdateProjectMemberRoleParams) (db.ProjectMember, error) {
+	return r.queries.UpdateProjectMemberRole(ctx, arg)
+}
+
+func (r *repository) GetUserByEmail(ctx context.Context, email string) (db.User, error) {
+	return r.queries.GetUserByEmail(ctx, email)
 }

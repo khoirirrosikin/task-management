@@ -47,29 +47,9 @@ type MockProjectRepository struct {
 	mock.Mock
 }
 
-func (m *MockProjectRepository) CreateProject(ctx context.Context, arg db.CreateProjectParams) (db.Project, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
-}
-
 func (m *MockProjectRepository) GetProjectByID(ctx context.Context, id uuid.UUID) (db.Project, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(db.Project), args.Error(1)
-}
-
-func (m *MockProjectRepository) ListProjectsByOwner(ctx context.Context, ownerID uuid.UUID) ([]db.Project, error) {
-	args := m.Called(ctx, ownerID)
-	return args.Get(0).([]db.Project), args.Error(1)
-}
-
-func (m *MockProjectRepository) UpdateProject(ctx context.Context, arg db.UpdateProjectParams) (db.Project, error) {
-	args := m.Called(ctx, arg)
-	return args.Get(0).(db.Project), args.Error(1)
-}
-
-func (m *MockProjectRepository) DeleteProject(ctx context.Context, arg db.DeleteProjectParams) error {
-	args := m.Called(ctx, arg)
-	return args.Error(0)
 }
 
 func TestCreateTask_Success(t *testing.T) {

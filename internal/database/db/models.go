@@ -18,6 +18,14 @@ type Project struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ProjectMember struct {
+	ID        uuid.UUID          `json:"id"`
+	ProjectID uuid.UUID          `json:"project_id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Role      string             `json:"role"`
+	JoinedAt  pgtype.Timestamptz `json:"joined_at"`
+}
+
 type Task struct {
 	ID          uuid.UUID          `json:"id"`
 	ProjectID   uuid.UUID          `json:"project_id"`

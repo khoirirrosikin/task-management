@@ -82,16 +82,20 @@ task-management/
 │           ├── models.go
 │           ├── users.sql.go
 │           ├── projects.sql.go
-│           └── tasks.sql.go
+│           ├── tasks.sql.go
+│           └── project_members.sql.go
 ├── sql/
 │   ├── migrations/                 # Versioned DDL migrations for goose
 │   │   ├── 00001_create_users_table.sql
 │   │   ├── 00002_create_projects_table.sql
-│   │   └── 00003_create_tasks_table.sql
+│   │   ├── 00003_create_tasks_table.sql
+│   │   └── 00004_create_project_members_table.sql
 │   └── queries/                    # Raw SQL queries for sqlc
 │       ├── users.sql
 │       ├── projects.sql
-│       └── tasks.sql
+│       ├── tasks.sql
+│       └── project_members.sql
+├── api.http                        # REST Client HTTP test scenarios for live testing
 ├── docker-compose.yml              # Local PostgreSQL container definition
 ├── sqlc.yaml                       # sqlc code generation configuration
 ├── go.mod
@@ -102,7 +106,7 @@ task-management/
 
 ## 🗺️ Roadmap & Features
 
-### Phase 1 — Foundation (Current)
+### Phase 1 — Foundation (Completed)
 - [x] Docker & PostgreSQL 16 environment setup
 - [x] Database migration system with `goose`
 - [x] Type-safe query generation with `sqlc`
@@ -117,12 +121,16 @@ task-management/
 - [x] CRUD Project (Create, List, Detail, Update, Delete)
 - [x] CRUD Task (Title, Description, Status, Due Date, Priority)
 - [x] Unit test suite for Task Service & Handler (100% Mock-driven, 84%+ coverage)
-- [ ] Unit test suite for Task Repository with `pgxmock`
+- [x] Comprehensive REST Client test file (`api.http`)
 
-### Phase 2 — Collaboration & RBAC
-- [ ] Project member invitation (via email/username)
-- [ ] Project-level Role-Based Access Control (`owner` vs `member`)
-- [ ] Task assignment to project members
+### Phase 2 — Collaboration & RBAC (In Progress)
+- [x] Database migration for project members (`00004_create_project_members_table.sql`)
+- [x] Type-safe queries for project members with `sqlc` (`project_members.sql`)
+- [x] Architectural refactoring: Interface Segregation Principle (ISP) decoupling `task` from `project`
+- [x] Project member business logic in `project.Service` (`AddMember`, `ListMembers`, `RemoveMember`, `UpdateMemberRole`)
+- [ ] HTTP handlers & routes for project members (`/api/v1/projects/:id/members`)
+- [ ] Unit tests for project member service & handler
+- [ ] Task assignment validation to project members
 - [ ] Task comments & discussions
 
 ### Phase 3 — Advanced Value (Portfolio Standout)
