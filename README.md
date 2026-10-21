@@ -128,8 +128,8 @@ task-management/
 - [x] Type-safe queries for project members with `sqlc` (`project_members.sql`)
 - [x] Architectural refactoring: Interface Segregation Principle (ISP) decoupling `task` from `project`
 - [x] Project member business logic in `project.Service` (`AddMember`, `ListMembers`, `RemoveMember`, `UpdateMemberRole`)
-- [ ] HTTP handlers & routes for project members (`/api/v1/projects/:id/members`)
-- [ ] Unit tests for project member service & handler
+- [x] HTTP handlers & routes for project members (`/api/v1/projects/:id/members`)
+- [x] Unit tests for project member service & handler (100% Mock-driven)
 - [ ] Task assignment validation to project members
 - [ ] Task comments & discussions
 
@@ -437,6 +437,90 @@ go test -cover ./internal/task
 {
   "success": true,
   "message": "Project deleted successfully"
+}
+```
+
+### Add Project Member
+- **Endpoint:** `POST /api/v1/projects/:id/members`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "email": "jane.collaborator@example.com",
+  "role": "member"
+}
+```
+- **Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "Member added successfully",
+  "data": {
+    "id": "7fa12c01-7fa1-42cb-b72e-c1214a1a679e",
+    "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+    "user_id": "38a7c290-c964-4958-a9c5-9c2ad422ff8f",
+    "user_name": "Jane Collaborator",
+    "user_email": "jane.collaborator@example.com",
+    "role": "member",
+    "joined_at": "2026-10-21T14:00:00Z"
+  }
+}
+```
+
+### List Project Members
+- **Endpoint:** `GET /api/v1/projects/:id/members`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Members retrieved successfully",
+  "data": [
+    {
+      "id": "7fa12c01-7fa1-42cb-b72e-c1214a1a679e",
+      "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+      "user_id": "38a7c290-c964-4958-a9c5-9c2ad422ff8f",
+      "user_name": "Jane Collaborator",
+      "user_email": "jane.collaborator@example.com",
+      "role": "member",
+      "joined_at": "2026-10-21T14:00:00Z"
+    }
+  ]
+}
+```
+
+### Update Project Member Role
+- **Endpoint:** `PUT /api/v1/projects/:id/members/:userId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "role": "owner"
+}
+```
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "member role updated successfully",
+  "data": {
+    "id": "7fa12c01-7fa1-42cb-b72e-c1214a1a679e",
+    "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+    "user_id": "38a7c290-c964-4958-a9c5-9c2ad422ff8f",
+    "role": "owner",
+    "joined_at": "2026-10-21T14:00:00Z"
+  }
+}
+```
+
+### Remove Project Member
+- **Endpoint:** `DELETE /api/v1/projects/:id/members/:userId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Member removed successfully"
 }
 ```
 

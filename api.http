@@ -14,8 +14,8 @@ Content-Type: {{contentType}}
 ### 2. AUTHENTICATION MODULE
 ### =========================================================================
 
-### 2.1. Register User (Success)
-# @name register
+### 2.1. Register Owner / Primary User (Success)
+# @name registerOwner
 POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
@@ -35,8 +35,8 @@ Content-Type: {{contentType}}
   "password": "secretpassword123"
 }
 
-### 2.3. Login User (Success)
-# @name login
+### 2.3. Login Owner / Primary User (Success)
+# @name loginOwner
 POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
@@ -45,8 +45,8 @@ Content-Type: {{contentType}}
   "password": "secretpassword123"
 }
 
-### Ambil token dari response login di atas
-@authToken = {{login.response.body.data.token}}
+### Extract auth token from login response above
+@authToken = {{loginOwner.response.body.data.token}}
 
 ### 2.4. Login User (Wrong Password - Expected 401 Unauthorized)
 POST {{baseUrl}}/auth/login
@@ -56,6 +56,20 @@ Content-Type: {{contentType}}
   "email": "khoirir.rosikin@gmail.com",
   "password": "wrongpassword"
 }
+
+### 2.5. Register Collaborator User (Success)
+# @name registerCollaborator
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Jane Collaborator",
+  "email": "jane.collaborator@example.com",
+  "password": "collabpassword123"
+}
+
+### Extract collaborator email
+@collaboratorEmail = jane.collaborator@example.com
 
 
 ### =========================================================================
@@ -73,7 +87,7 @@ Authorization: Bearer {{authToken}}
   "description": "Building a robust Task Management API with Go and PostgreSQL"
 }
 
-### Ambil ID project yang baru dibuat
+### Extract project ID from response above
 @projectId = {{createProject.response.body.data.id}}
 
 ### 3.2. Create Project (Validation Error - Expected 400 Bad Request)
@@ -105,10 +119,66 @@ Authorization: Bearer {{authToken}}
 
 
 ### =========================================================================
-### 4. TASK MODULE
+### 4. PROJECT MEMBERS MODULE
 ### =========================================================================
 
-### 4.1. Create Task 1 - Todo / High Priority (Success)
+### 4.1. Add Project Member (Success)
+# @name addMember
+POST {{baseUrl}}/projects/{{projectId}}/members
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "email": "{{collaboratorEmail}}",
+  "role": "member"
+}
+
+### Extract member user ID from response above
+@memberUserId = {{addMember.response.body.data.user_id}}
+
+### 4.2. Add Project Member (Validation Error - Invalid Email)
+POST {{baseUrl}}/projects/{{projectId}}/members
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "email": "invalid-email-address",
+  "role": "member"
+}
+
+### 4.3. Add Project Member (Cannot Add Self - Expected 400 Bad Request)
+POST {{baseUrl}}/projects/{{projectId}}/members
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "email": "khoirir.rosikin@gmail.com",
+  "role": "member"
+}
+
+### 4.4. List Project Members (Success)
+GET {{baseUrl}}/projects/{{projectId}}/members
+Authorization: Bearer {{authToken}}
+
+### 4.5. Update Member Role (Success)
+PUT {{baseUrl}}/projects/{{projectId}}/members/{{memberUserId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "role": "owner"
+}
+
+### 4.6. Remove Member from Project (Success)
+DELETE {{baseUrl}}/projects/{{projectId}}/members/{{memberUserId}}
+Authorization: Bearer {{authToken}}
+
+
+### =========================================================================
+### 5. TASK MODULE
+### =========================================================================
+
+### 5.1. Create Task 1 - Todo / High Priority (Success)
 # @name createTask1
 POST {{baseUrl}}/projects/{{projectId}}/tasks
 Content-Type: {{contentType}}
@@ -122,10 +192,10 @@ Authorization: Bearer {{authToken}}
   "due_date": "2026-10-15T18:00:00Z"
 }
 
-### Ambil Task ID yang baru dibuat
+### Extract task ID from response above
 @taskId = {{createTask1.response.body.data.id}}
 
-### 4.2. Create Task 2 - In Progress / Medium Priority
+### 5.2. Create Task 2 - In Progress / Medium Priority (Success)
 POST {{baseUrl}}/projects/{{projectId}}/tasks
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -137,7 +207,7 @@ Authorization: Bearer {{authToken}}
   "priority": "medium"
 }
 
-### 4.3. Create Task (Validation Error - Title Terlalu Pendek / Kosong)
+### 5.3. Create Task (Validation Error - Title Too Short / Empty)
 POST {{baseUrl}}/projects/{{projectId}}/tasks
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -147,15 +217,15 @@ Authorization: Bearer {{authToken}}
   "status": "todo"
 }
 
-### 4.4. List Tasks by Project (Success)
+### 5.4. List Tasks by Project (Success)
 GET {{baseUrl}}/projects/{{projectId}}/tasks
 Authorization: Bearer {{authToken}}
 
-### 4.5. Get Task by ID (Success)
+### 5.5. Get Task by ID (Success)
 GET {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
-### 4.6. Update Task - Ubah Status ke Completed (Success)
+### 5.6. Update Task - Change Status to Completed (Success)
 PUT {{baseUrl}}/tasks/{{taskId}}
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -166,7 +236,7 @@ Authorization: Bearer {{authToken}}
   "priority": "urgent"
 }
 
-### 4.7. Update Task (Validation Error - Status Tidak Valid)
+### 5.7. Update Task (Validation Error - Invalid Status)
 PUT {{baseUrl}}/tasks/{{taskId}}
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -175,35 +245,35 @@ Authorization: Bearer {{authToken}}
   "status": "pending_approval"
 }
 
-### 4.8. Delete Task (Success)
+### 5.8. Delete Task (Success)
 DELETE {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
-### 4.9. Get Deleted Task (Expected 404 Not Found)
+### 5.9. Get Deleted Task (Expected 404 Not Found)
 GET {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
 
 ### =========================================================================
-### 5. CLEANUP / DELETE PROJECT
+### 6. CLEANUP / DELETE PROJECT
 ### =========================================================================
 
-### 5.1. Delete Project (Success)
+### 6.1. Delete Project (Success)
 DELETE {{baseUrl}}/projects/{{projectId}}
 Authorization: Bearer {{authToken}}
 
-### 5.2. Get Deleted Project (Expected 404 Not Found)
+### 6.2. Get Deleted Project (Expected 404 Not Found)
 GET {{baseUrl}}/projects/{{projectId}}
 Authorization: Bearer {{authToken}}
 
 
 ### =========================================================================
-### 6. SECURITY & UNAUTHORIZED SCENARIOS
+### 7. SECURITY & UNAUTHORIZED SCENARIOS
 ### =========================================================================
 
-### 6.1. Access Protected Route Without Token (Expected 401 Unauthorized)
+### 7.1. Access Protected Route Without Token (Expected 401 Unauthorized)
 GET {{baseUrl}}/projects
 
-### 6.2. Access Protected Route With Invalid/Tampered Token (Expected 401)
+### 7.2. Access Protected Route With Invalid/Tampered Token (Expected 401 Unauthorized)
 GET {{baseUrl}}/projects
 Authorization: Bearer invalid_jwt_token_here

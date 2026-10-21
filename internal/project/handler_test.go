@@ -360,3 +360,152 @@ func TestHandler_DeleteProject_Unauthorized(t *testing.T) {
 	assert.Equal(t, "Unauthorized to access this project", res.Message)
 	mockService.AssertExpectations(t)
 }
+
+func TestHandler_AddMember_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	memberUserID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	reqBody := AddMemberRequest{
+		Email: "member@example.com",
+		Role:  "member",
+	}
+
+	expectedRes := &MemberResponse{
+		ID:        uuid.New().String(),
+		ProjectID: projectID.String(),
+		UserID:    memberUserID.String(),
+		UserName:  "Member User",
+		UserEmail: reqBody.Email,
+		Role:      reqBody.Role,
+		JoinedAt:  time.Now(),
+	}
+
+	mockService.On("AddMember", mock.Anything, projectID, testUserID, reqBody).
+		Return(expectedRes, nil)
+
+	w := performRequest(router, http.MethodPost, "/api/v1/projects/"+projectID.String()+"/members", reqBody)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Member added successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_AddMember_ValidationError(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	reqBody := map[string]string{
+		"email": "invalid-email-format",
+	}
+
+	w := performRequest(router, http.MethodPost, "/api/v1/projects/"+projectID.String()+"/members", reqBody)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.False(t, res.Success)
+	assert.Equal(t, "Validation error", res.Message)
+	mockService.AssertNotCalled(t, "AddMember")
+}
+
+func TestHandler_ListMembers_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	expectedRes := []MemberResponse{
+		{
+			ID:        uuid.New().String(),
+			ProjectID: projectID.String(),
+			UserID:    testUserID.String(),
+			UserName:  "Owner",
+			UserEmail: "owner@example.com",
+			Role:      "owner",
+			JoinedAt:  time.Now(),
+		},
+	}
+
+	mockService.On("ListMembers", mock.Anything, projectID, testUserID).
+		Return(expectedRes, nil)
+
+	w := performRequest(router, http.MethodGet, "/api/v1/projects/"+projectID.String()+"/members", nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Members retrieved successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_UpdateMemberRole_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	memberUserID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	reqBody := UpdateMemberRoleRequest{
+		Role: "owner",
+	}
+
+	expectedRes := &MemberResponse{
+		ID:        uuid.New().String(),
+		ProjectID: projectID.String(),
+		UserID:    memberUserID.String(),
+		Role:      reqBody.Role,
+		JoinedAt:  time.Now(),
+	}
+
+	mockService.On("UpdateMemberRole", mock.Anything, projectID, testUserID, memberUserID, reqBody).
+		Return(expectedRes, nil)
+
+	w := performRequest(router, http.MethodPut, "/api/v1/projects/"+projectID.String()+"/members/"+memberUserID.String(), reqBody)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "member role updated successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_RemoveMember_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	memberUserID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	mockService.On("RemoveMember", mock.Anything, projectID, testUserID, memberUserID).
+		Return(nil)
+
+	w := performRequest(router, http.MethodDelete, "/api/v1/projects/"+projectID.String()+"/members/"+memberUserID.String(), nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Member removed successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
