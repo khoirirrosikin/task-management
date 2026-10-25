@@ -9,7 +9,7 @@ type CreateTaskRequest struct {
 	Priority    string     `json:"priority" binding:"omitempty,oneof=low medium high urgent"`
 	AssignedTo  *string    `json:"assigned_to" binding:"omitempty,uuid"`
 	DueDate     *time.Time `json:"due_date"`
-}	
+}
 
 type UpdateTaskRequest struct {
 	Title       string     `json:"title" binding:"omitempty,min=2,max=200"`
@@ -27,8 +27,22 @@ type TaskResponse struct {
 	Description string     `json:"description"`
 	Status      string     `json:"status"`
 	Priority    string     `json:"priority"`
-	AssignedTo 	*string    `json:"assigned_to"`
+	AssignedTo  *string    `json:"assigned_to"`
 	DueDate     *time.Time `json:"due_date"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type CreateCommentRequest struct {
+	Content string `json:"content" binding:"required,min=1,max=2000"`
+}
+
+type CommentResponse struct {
+	ID        string    `json:"id"`
+	TaskID    string    `json:"task_id"`
+	UserID    string    `json:"user_id"`
+	UserName  string    `json:"user_name,omitempty"`
+	UserEmail string    `json:"user_email,omitempty"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
 }

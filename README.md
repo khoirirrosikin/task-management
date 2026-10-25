@@ -83,18 +83,21 @@ task-management/
 │           ├── users.sql.go
 │           ├── projects.sql.go
 │           ├── tasks.sql.go
-│           └── project_members.sql.go
+│           ├── project_members.sql.go
+│           └── comments.sql.go
 ├── sql/
 │   ├── migrations/                 # Versioned DDL migrations for goose
 │   │   ├── 00001_create_users_table.sql
 │   │   ├── 00002_create_projects_table.sql
 │   │   ├── 00003_create_tasks_table.sql
-│   │   └── 00004_create_project_members_table.sql
+│   │   ├── 00004_create_project_members_table.sql
+│   │   └── 00005_create_comments_table.sql
 │   └── queries/                    # Raw SQL queries for sqlc
 │       ├── users.sql
 │       ├── projects.sql
 │       ├── tasks.sql
-│       └── project_members.sql
+│       ├── project_members.sql
+│       └── comments.sql
 ├── api.http                        # REST Client HTTP test scenarios for live testing
 ├── docker-compose.yml              # Local PostgreSQL container definition
 ├── sqlc.yaml                       # sqlc code generation configuration
@@ -123,7 +126,7 @@ task-management/
 - [x] Unit test suite for Task Service & Handler (100% Mock-driven, 84%+ coverage)
 - [x] Comprehensive REST Client test file (`api.http`)
 
-### Phase 2 — Collaboration & RBAC (In Progress)
+### Phase 2 — Collaboration & RBAC (Completed)
 - [x] Database migration for project members (`00004_create_project_members_table.sql`)
 - [x] Type-safe queries for project members with `sqlc` (`project_members.sql`)
 - [x] Architectural refactoring: Interface Segregation Principle (ISP) decoupling `task` from `project`
@@ -131,7 +134,7 @@ task-management/
 - [x] HTTP handlers & routes for project members (`/api/v1/projects/:id/members`)
 - [x] Unit tests for project member service & handler (100% Mock-driven)
 - [x] Task assignment validation to project members
-- [ ] Task comments & discussions
+- [x] Task comments & discussions (`00005_create_comments_table.sql`, `/api/v1/tasks/:id/comments`)
 
 ### Phase 3 — Advanced Value (Portfolio Standout)
 - [ ] Asynchronous task notification system using Go goroutines & channels
@@ -644,6 +647,63 @@ go test -cover ./internal/task
 {
   "success": true,
   "message": "Task deleted successfully"
+}
+```
+
+### Add Comment to Task
+- **Endpoint:** `POST /api/v1/tasks/:id/comments`
+- **Headers:** `Authorization: Bearer <token>`
+- **Request Body:**
+```json
+{
+  "content": "Database schema looks solid, ready for review!"
+}
+```
+- **Response:** `201 Created`
+```json
+{
+  "success": true,
+  "message": "Comment added successfully",
+  "data": {
+    "id": "9a8b7c6d-1234-4ec5-b286-d24eef6ff2aa",
+    "task_id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+    "user_id": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+    "content": "Database schema looks solid, ready for review!",
+    "created_at": "2026-10-25T20:45:00Z"
+  }
+}
+```
+
+### List Task Comments
+- **Endpoint:** `GET /api/v1/tasks/:id/comments`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Comments retrieved successfully",
+  "data": [
+    {
+      "id": "9a8b7c6d-1234-4ec5-b286-d24eef6ff2aa",
+      "task_id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+      "user_id": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+      "user_name": "Khoirir Rosikin",
+      "user_email": "khoirir.rosikin@gmail.com",
+      "content": "Database schema looks solid, ready for review!",
+      "created_at": "2026-10-25T20:45:00Z"
+    }
+  ]
+}
+```
+
+### Delete Task Comment
+- **Endpoint:** `DELETE /api/v1/tasks/:id/comments/:commentId`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Comment deleted successfully"
 }
 ```
 

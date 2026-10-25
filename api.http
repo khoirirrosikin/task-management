@@ -256,11 +256,41 @@ Authorization: Bearer {{authToken}}
   "status": "pending_approval"
 }
 
-### 5.9. Delete Task (Success)
+### 5.9. Add Comment to Task (Success)
+# @name addComment
+POST {{baseUrl}}/tasks/{{taskId}}/comments
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "content": "Database schema looks solid, ready for review!"
+}
+
+### Extract comment ID from response above
+@commentId = {{addComment.response.body.data.id}}
+
+### 5.10. Add Comment to Task (Validation Error - Empty Content)
+POST {{baseUrl}}/tasks/{{taskId}}/comments
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "content": ""
+}
+
+### 5.11. List Task Comments (Success)
+GET {{baseUrl}}/tasks/{{taskId}}/comments
+Authorization: Bearer {{authToken}}
+
+### 5.12. Delete Task Comment (Success)
+DELETE {{baseUrl}}/tasks/{{taskId}}/comments/{{commentId}}
+Authorization: Bearer {{authToken}}
+
+### 5.13. Delete Task (Success)
 DELETE {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
-### 5.10. Get Deleted Task (Expected 404 Not Found)
+### 5.14. Get Deleted Task (Expected 404 Not Found)
 GET {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 

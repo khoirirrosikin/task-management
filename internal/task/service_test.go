@@ -43,6 +43,26 @@ func (m *MockTaskRepository) DeleteTask(ctx context.Context, id uuid.UUID) error
 	return args.Error(0)
 }
 
+func (m *MockTaskRepository) CreateComment(ctx context.Context, arg db.CreateCommentParams) (db.Comment, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Comment), args.Error(1)
+}
+
+func (m *MockTaskRepository) GetCommentByID(ctx context.Context, id uuid.UUID) (db.Comment, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(db.Comment), args.Error(1)
+}
+
+func (m *MockTaskRepository) ListCommentsByTask(ctx context.Context, taskID uuid.UUID) ([]db.ListCommentsByTaskRow, error) {
+	args := m.Called(ctx, taskID)
+	return args.Get(0).([]db.ListCommentsByTaskRow), args.Error(1)
+}
+
+func (m *MockTaskRepository) DeleteComment(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 type MockProjectRepository struct {
 	mock.Mock
 }
@@ -532,4 +552,157 @@ func TestUpdateTask_AssigneeNotMember(t *testing.T) {
 	assert.Equal(t, "Assignee is not a member of this project", appErr.Message)
 	mockProjectRepo.AssertExpectations(t)
 	mockTaskRepo.AssertNotCalled(t, "UpdateTask")
+}
+
+func TestAddComment_Success(t *testing.T) {
+	mockTaskRepo := new(MockTaskRepository)
+	mockProjectRepo := new(MockProjectRepository)
+	service := NewService(mockTaskRepo, mockProjectRepo)
+
+	taskID := uuid.New()
+	projectID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+
+	req := CreateCommentRequest{
+		Content: "Looks good to me!",
+	}
+
+	mockTask := db.Task{ID: taskID, ProjectID: projectID}
+	mockProject := db.Project{ID: projectID, OwnerID: userID}
+	mockComment := db.Comment{
+		ID:        uuid.New(),
+		TaskID:    taskID,
+		UserID:    userID,
+		Content:   req.Content,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+
+	mockTaskRepo.On("GetTaskByID", mock.Anything, taskID).Return(mockTask, nil)
+	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).Return(mockProject, nil)
+	mockTaskRepo.On("CreateComment", mock.Anything, db.CreateCommentParams{
+		TaskID:  taskID,
+		UserID:  userID,
+		Content: req.Content,
+	}).Return(mockComment, nil)
+
+	res, err := service.AddComment(context.Background(), taskID, userID, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, mockComment.ID.String(), res.ID)
+	assert.Equal(t, req.Content, res.Content)
+	mockTaskRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestListComments_Success(t *testing.T) {
+	mockTaskRepo := new(MockTaskRepository)
+	mockProjectRepo := new(MockProjectRepository)
+	service := NewService(mockTaskRepo, mockProjectRepo)
+
+	taskID := uuid.New()
+	projectID := uuid.New()
+	userID := uuid.New()
+	now := time.Now()
+
+	mockTask := db.Task{ID: taskID, ProjectID: projectID}
+	mockProject := db.Project{ID: projectID, OwnerID: userID}
+	mockComments := []db.ListCommentsByTaskRow{
+		{
+			ID:        uuid.New(),
+			TaskID:    taskID,
+			UserID:    userID,
+			UserName:  "Khoirir",
+			UserEmail: "khoirir@example.com",
+			Content:   "First comment",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	mockTaskRepo.On("GetTaskByID", mock.Anything, taskID).Return(mockTask, nil)
+	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).Return(mockProject, nil)
+	mockTaskRepo.On("ListCommentsByTask", mock.Anything, taskID).Return(mockComments, nil)
+
+	res, err := service.ListComments(context.Background(), taskID, userID)
+
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+	assert.Equal(t, "First comment", res[0].Content)
+	assert.Equal(t, "Khoirir", res[0].UserName)
+	mockTaskRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestDeleteComment_Success_ByAuthor(t *testing.T) {
+	mockTaskRepo := new(MockTaskRepository)
+	mockProjectRepo := new(MockProjectRepository)
+	service := NewService(mockTaskRepo, mockProjectRepo)
+
+	taskID := uuid.New()
+	projectID := uuid.New()
+	ownerID := uuid.New()
+	memberID := uuid.New()
+	commentID := uuid.New()
+
+	mockTask := db.Task{ID: taskID, ProjectID: projectID}
+	mockProject := db.Project{ID: projectID, OwnerID: ownerID}
+	mockComment := db.Comment{
+		ID:     commentID,
+		TaskID: taskID,
+		UserID: memberID,
+	}
+
+	mockTaskRepo.On("GetTaskByID", mock.Anything, taskID).Return(mockTask, nil)
+	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).Return(mockProject, nil)
+	mockProjectRepo.On("GetProjectMember", mock.Anything, db.GetProjectMemberParams{
+		ProjectID: projectID,
+		UserID:    memberID,
+	}).Return(db.ProjectMember{ProjectID: projectID, UserID: memberID, Role: "member"}, nil)
+	mockTaskRepo.On("GetCommentByID", mock.Anything, commentID).Return(mockComment, nil)
+	mockTaskRepo.On("DeleteComment", mock.Anything, commentID).Return(nil)
+
+	err := service.DeleteComment(context.Background(), taskID, commentID, memberID)
+
+	assert.NoError(t, err)
+	mockTaskRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestDeleteComment_Forbidden_OtherMember(t *testing.T) {
+	mockTaskRepo := new(MockTaskRepository)
+	mockProjectRepo := new(MockProjectRepository)
+	service := NewService(mockTaskRepo, mockProjectRepo)
+
+	taskID := uuid.New()
+	projectID := uuid.New()
+	ownerID := uuid.New()
+	authorID := uuid.New()
+	otherMemberID := uuid.New()
+	commentID := uuid.New()
+
+	mockTask := db.Task{ID: taskID, ProjectID: projectID}
+	mockProject := db.Project{ID: projectID, OwnerID: ownerID}
+	mockComment := db.Comment{
+		ID:     commentID,
+		TaskID: taskID,
+		UserID: authorID,
+	}
+
+	mockTaskRepo.On("GetTaskByID", mock.Anything, taskID).Return(mockTask, nil)
+	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).Return(mockProject, nil)
+	mockProjectRepo.On("GetProjectMember", mock.Anything, db.GetProjectMemberParams{
+		ProjectID: projectID,
+		UserID:    otherMemberID,
+	}).Return(db.ProjectMember{ProjectID: projectID, UserID: otherMemberID, Role: "member"}, nil)
+	mockTaskRepo.On("GetCommentByID", mock.Anything, commentID).Return(mockComment, nil)
+
+	err := service.DeleteComment(context.Background(), taskID, commentID, otherMemberID)
+
+	assert.Error(t, err)
+	var appErr *response.AppError
+	assert.True(t, errors.As(err, &appErr))
+	assert.Equal(t, 403, appErr.Code)
+	assert.Equal(t, "Unauthorized to delete this comment", appErr.Message)
+	mockTaskRepo.AssertNotCalled(t, "DeleteComment")
 }

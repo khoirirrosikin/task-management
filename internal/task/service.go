@@ -17,6 +17,10 @@ type Service interface {
 	ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]TaskResponse, error)
 	UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req UpdateTaskRequest) (*TaskResponse, error)
 	DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
+
+	AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req CreateCommentRequest) (*CommentResponse, error)
+	ListComments(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) ([]CommentResponse, error)
+	DeleteComment(ctx context.Context, taskID uuid.UUID, commentID uuid.UUID, userID uuid.UUID) error
 }
 
 type ProjectRepository interface {
@@ -25,13 +29,13 @@ type ProjectRepository interface {
 }
 
 type service struct {
-	repo Repository
+	repo        Repository
 	projectRepo ProjectRepository
 }
 
 func NewService(repo Repository, projectRepo ProjectRepository) Service {
 	return &service{
-		repo: repo,
+		repo:        repo,
 		projectRepo: projectRepo,
 	}
 }
@@ -63,15 +67,15 @@ func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uu
 
 	arg := db.CreateTaskParams{
 		ProjectID: projectID,
-		Title: req.Title,
+		Title:     req.Title,
 		Description: pgtype.Text{
 			String: req.Description,
-			Valid: req.Description != "",
+			Valid:  req.Description != "",
 		},
-		Status: status,
-		Priority: priority,
+		Status:     status,
+		Priority:   priority,
 		AssignedTo: assignedTo,
-		DueDate: parseDueDate(req.DueDate),
+		DueDate:    parseDueDate(req.DueDate),
 	}
 
 	task, err := s.repo.CreateTask(ctx, arg)
@@ -116,13 +120,13 @@ func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 	}
 
 	arg := db.UpdateTaskParams{
-		ID: taskID,
-		Title: existingTask.Title,
+		ID:          taskID,
+		Title:       existingTask.Title,
 		Description: existingTask.Description,
-		Status: existingTask.Status,
-		Priority: existingTask.Priority,
-		AssignedTo: existingTask.AssignedTo,
-		DueDate: existingTask.DueDate,
+		Status:      existingTask.Status,
+		Priority:    existingTask.Priority,
+		AssignedTo:  existingTask.AssignedTo,
+		DueDate:     existingTask.DueDate,
 	}
 
 	if req.Title != "" {
@@ -176,6 +180,77 @@ func (s *service) DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 	return nil
 }
 
+func (s *service) AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req CreateCommentRequest) (*CommentResponse, error) {
+	if _, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
+		return nil, err
+	}
+
+	comment, err := s.repo.CreateComment(ctx, db.CreateCommentParams{
+		TaskID:  taskID,
+		UserID:  userID,
+		Content: req.Content,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create comment: %w", err)
+	}
+
+	return &CommentResponse{
+		ID:        comment.ID.String(),
+		TaskID:    comment.TaskID.String(),
+		UserID:    comment.UserID.String(),
+		Content:   comment.Content,
+		CreatedAt: comment.CreatedAt.Time,
+	}, nil
+}
+
+func (s *service) ListComments(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) ([]CommentResponse, error) {
+	if _, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
+		return nil, err
+	}
+
+	comments, err := s.repo.ListCommentsByTask(ctx, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list comments: %w", err)
+	}
+
+	responses := make([]CommentResponse, len(comments))
+	for i, c := range comments {
+		responses[i] = CommentResponse{
+			ID:        c.ID.String(),
+			TaskID:    c.TaskID.String(),
+			UserID:    c.UserID.String(),
+			UserName:  c.UserName,
+			UserEmail: c.UserEmail,
+			Content:   c.Content,
+			CreatedAt: c.CreatedAt.Time,
+		}
+	}
+
+	return responses, nil
+}
+
+func (s *service) DeleteComment(ctx context.Context, taskID uuid.UUID, commentID uuid.UUID, userID uuid.UUID) error {
+	_, project, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+
+	comment, err := s.repo.GetCommentByID(ctx, commentID)
+	if err != nil || comment.TaskID != taskID {
+		return response.ErrNotFound("Comment not found")
+	}
+
+	if comment.UserID != userID && project.OwnerID != userID {
+		return response.ErrForbidden("Unauthorized to delete this comment")
+	}
+
+	if err := s.repo.DeleteComment(ctx, commentID); err != nil {
+		return fmt.Errorf("Failed to delete comment: %w", err)
+	}
+
+	return nil
+}
+
 func (s *service) verifyProjectAccess(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) (db.Project, error) {
 	project, err := s.projectRepo.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -188,7 +263,7 @@ func (s *service) verifyProjectAccess(ctx context.Context, projectID uuid.UUID, 
 
 	_, err = s.projectRepo.GetProjectMember(ctx, db.GetProjectMemberParams{
 		ProjectID: projectID,
-		UserID: userID,
+		UserID:    userID,
 	})
 	if err != nil {
 		return db.Project{}, response.ErrForbidden("Unauthorized to access this project")
@@ -223,7 +298,7 @@ func (s *service) validateAssignee(ctx context.Context, project db.Project, assi
 
 	_, err := s.projectRepo.GetProjectMember(ctx, db.GetProjectMemberParams{
 		ProjectID: project.ID,
-		UserID: assigneeID,
+		UserID:    assigneeID,
 	})
 	if err != nil {
 		return response.ErrBadRequest("Assignee is not a member of this project")
@@ -251,16 +326,16 @@ func toTaskResponse(t db.Task) *TaskResponse {
 	}
 
 	return &TaskResponse{
-		ID: t.ID.String(),
-		ProjectID: t.ProjectID.String(),
-		Title: t.Title,
+		ID:          t.ID.String(),
+		ProjectID:   t.ProjectID.String(),
+		Title:       t.Title,
 		Description: desc,
-		Status: t.Status,
-		Priority: t.Priority,
-		AssignedTo: assignedTo,
-		DueDate: dueDate,
-		CreatedAt: t.CreatedAt.Time,
-		UpdatedAt: t.UpdatedAt.Time,
+		Status:      t.Status,
+		Priority:    t.Priority,
+		AssignedTo:  assignedTo,
+		DueDate:     dueDate,
+		CreatedAt:   t.CreatedAt.Time,
+		UpdatedAt:   t.UpdatedAt.Time,
 	}
 }
 

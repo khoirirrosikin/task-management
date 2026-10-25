@@ -13,6 +13,11 @@ type Repository interface {
 	ListTaskByProject(ctx context.Context, projectID uuid.UUID) ([]db.Task, error)
 	UpdateTask(ctx context.Context, arg db.UpdateTaskParams) (db.Task, error)
 	DeleteTask(ctx context.Context, id uuid.UUID) error
+
+	CreateComment(ctx context.Context, arg db.CreateCommentParams) (db.Comment, error)
+	GetCommentByID(ctx context.Context, id uuid.UUID) (db.Comment, error)
+	ListCommentsByTask(ctx context.Context, taskID uuid.UUID) ([]db.ListCommentsByTaskRow, error)
+	DeleteComment(ctx context.Context, id uuid.UUID) error
 }
 
 type repository struct {
@@ -43,4 +48,20 @@ func (r *repository) UpdateTask(ctx context.Context, arg db.UpdateTaskParams) (d
 
 func (r *repository) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	return r.queries.DeleteTask(ctx, id)
+}
+
+func (r *repository) CreateComment(ctx context.Context, arg db.CreateCommentParams) (db.Comment, error) {
+	return r.queries.CreateComment(ctx, arg)
+}
+
+func (r *repository) GetCommentByID(ctx context.Context, id uuid.UUID) (db.Comment, error) {
+	return r.queries.GetCommentByID(ctx, id)
+}
+
+func (r *repository) ListCommentsByTask(ctx context.Context, taskID uuid.UUID) ([]db.ListCommentsByTaskRow, error) {
+	return r.queries.ListCommentsByTask(ctx, taskID)
+}
+
+func (r *repository) DeleteComment(ctx context.Context, id uuid.UUID) error {
+	return r.queries.DeleteComment(ctx, id)
 }

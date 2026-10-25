@@ -32,6 +32,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, authMiddleware gin.Handler
 		tasks.GET("/:id", h.GetTaskByID)
 		tasks.PUT("/:id", h.UpdateTask)
 		tasks.DELETE("/:id", h.DeleteTask)
+
+		tasks.POST("/:id/comments", h.AddComment)
+		tasks.GET("/:id/comments", h.ListComments)
+		tasks.DELETE("/:id/comments/:commentId", h.DeleteComment)
 	}
 }
 
@@ -134,4 +138,70 @@ func (h *Handler) DeleteTask(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Task deleted successfully", nil)
+}
+
+func (h *Handler) AddComment(c *gin.Context) {
+	taskID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid task ID", nil)
+		return
+	}
+
+	var req CreateCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Validation error", response.FormatValidationError(err))
+		return
+	}
+
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	res, err := h.service.AddComment(c.Request.Context(), taskID, userID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusCreated, "Comment added successfully", res)
+}
+
+func (h *Handler) ListComments(c *gin.Context) {
+	taskID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid task ID", nil)
+		return
+	}
+
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	res, err := h.service.ListComments(c.Request.Context(), taskID, userID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Comments retrieved successfully", res)
+}
+
+func (h *Handler) DeleteComment(c *gin.Context) {
+	taskID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid task ID", nil)
+		return
+	}
+
+	commentID, err := uuid.Parse(c.Param("commentId"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid comment ID", nil)
+		return
+	}
+
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.service.DeleteComment(c.Request.Context(), taskID, commentID, userID); err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Comment deleted successfully", nil)
+
 }

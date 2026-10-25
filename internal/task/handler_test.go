@@ -59,6 +59,27 @@ func (m *MockService) DeleteTask(ctx context.Context, taskID uuid.UUID, userID u
 	return args.Error(0)
 }
 
+func (m *MockService) AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req CreateCommentRequest) (*CommentResponse, error) {
+	args := m.Called(ctx, taskID, userID, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*CommentResponse), args.Error(1)
+}
+
+func (m *MockService) ListComments(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) ([]CommentResponse, error) {
+	args := m.Called(ctx, taskID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]CommentResponse), args.Error(1)
+}
+
+func (m *MockService) DeleteComment(ctx context.Context, taskID uuid.UUID, commentID uuid.UUID, userID uuid.UUID) error {
+	args := m.Called(ctx, taskID, commentID, userID)
+	return args.Error(0)
+}
+
 func setupTestRouter(service Service, testUserID uuid.UUID) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
@@ -544,5 +565,119 @@ func TestHandler_deleteTask_NotFound(t *testing.T){
 	assert.NoError(t, err)
 	assert.False(t, res.Success)
 	assert.Equal(t, "Task not found", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_AddComment_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	taskID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	reqBody := CreateCommentRequest{
+		Content: "Great progress on this task!",
+	}
+
+	expectedRes := &CommentResponse{
+		ID:        uuid.New().String(),
+		TaskID:    taskID.String(),
+		UserID:    testUserID.String(),
+		Content:   reqBody.Content,
+		CreatedAt: time.Now(),
+	}
+
+	mockService.On("AddComment", mock.Anything, taskID, testUserID, reqBody).
+		Return(expectedRes, nil)
+
+	url := "/api/v1/tasks/" + taskID.String() + "/comments"
+	w := performRequest(router, http.MethodPost, url, reqBody)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Comment added successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_AddComment_ValidationError(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	taskID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	reqBody := CreateCommentRequest{
+		Content: "",
+	}
+
+	url := "/api/v1/tasks/" + taskID.String() + "/comments"
+	w := performRequest(router, http.MethodPost, url, reqBody)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.False(t, res.Success)
+	assert.Equal(t, "Validation error", res.Message)
+	mockService.AssertNotCalled(t, "AddComment")
+}
+
+func TestHandler_ListComments_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	taskID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	expectedRes := []CommentResponse{
+		{
+			ID:        uuid.New().String(),
+			TaskID:    taskID.String(),
+			UserID:    testUserID.String(),
+			UserName:  "Khoirir",
+			UserEmail: "khoirir@example.com",
+			Content:   "First comment",
+			CreatedAt: time.Now(),
+		},
+	}
+
+	mockService.On("ListComments", mock.Anything, taskID, testUserID).
+		Return(expectedRes, nil)
+
+	url := "/api/v1/tasks/" + taskID.String() + "/comments"
+	w := performRequest(router, http.MethodGet, url, nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Comments retrieved successfully", res.Message)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_DeleteComment_Success(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	taskID := uuid.New()
+	commentID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	mockService.On("DeleteComment", mock.Anything, taskID, commentID, testUserID).
+		Return(nil)
+
+	url := "/api/v1/tasks/" + taskID.String() + "/comments/" + commentID.String()
+	w := performRequest(router, http.MethodDelete, url, nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.Equal(t, "Comment deleted successfully", res.Message)
 	mockService.AssertExpectations(t)
 }
