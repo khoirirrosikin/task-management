@@ -130,7 +130,7 @@ task-management/
 - [x] Project member business logic in `project.Service` (`AddMember`, `ListMembers`, `RemoveMember`, `UpdateMemberRole`)
 - [x] HTTP handlers & routes for project members (`/api/v1/projects/:id/members`)
 - [x] Unit tests for project member service & handler (100% Mock-driven)
-- [ ] Task assignment validation to project members
+- [x] Task assignment validation to project members
 - [ ] Task comments & discussions
 
 ### Phase 3 — Advanced Value (Portfolio Standout)

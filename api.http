@@ -217,15 +217,26 @@ Authorization: Bearer {{authToken}}
   "status": "todo"
 }
 
-### 5.4. List Tasks by Project (Success)
+### 5.4. Create Task (Assignee Not a Project Member - Expected 400 Bad Request)
+POST {{baseUrl}}/projects/{{projectId}}/tasks
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "title": "Task Assigned to Non-Member",
+  "status": "todo",
+  "assigned_to": "00000000-0000-0000-0000-000000000001"
+}
+
+### 5.5. List Tasks by Project (Success)
 GET {{baseUrl}}/projects/{{projectId}}/tasks
 Authorization: Bearer {{authToken}}
 
-### 5.5. Get Task by ID (Success)
+### 5.6. Get Task by ID (Success)
 GET {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
-### 5.6. Update Task - Change Status to Completed (Success)
+### 5.7. Update Task - Change Status to Completed (Success)
 PUT {{baseUrl}}/tasks/{{taskId}}
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -236,7 +247,7 @@ Authorization: Bearer {{authToken}}
   "priority": "urgent"
 }
 
-### 5.7. Update Task (Validation Error - Invalid Status)
+### 5.8. Update Task (Validation Error - Invalid Status)
 PUT {{baseUrl}}/tasks/{{taskId}}
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
@@ -245,11 +256,11 @@ Authorization: Bearer {{authToken}}
   "status": "pending_approval"
 }
 
-### 5.8. Delete Task (Success)
+### 5.9. Delete Task (Success)
 DELETE {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 
-### 5.9. Get Deleted Task (Expected 404 Not Found)
+### 5.10. Get Deleted Task (Expected 404 Not Found)
 GET {{baseUrl}}/tasks/{{taskId}}
 Authorization: Bearer {{authToken}}
 

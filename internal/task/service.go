@@ -21,6 +21,7 @@ type Service interface {
 
 type ProjectRepository interface {
 	GetProjectByID(ctx context.Context, id uuid.UUID) (db.Project, error)
+	GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error)
 }
 
 type service struct {
@@ -36,7 +37,8 @@ func NewService(repo Repository, projectRepo ProjectRepository) Service {
 }
 
 func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, req CreateTaskRequest) (*TaskResponse, error) {
-	if _, err := s.verifyProjectOwner(ctx, projectID, userID); err != nil {
+	project, err := s.verifyProjectAccess(ctx, projectID, userID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -52,6 +54,10 @@ func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uu
 
 	assignedTo, err := parseAssignedTo(req.AssignedTo)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := s.validateAssignee(ctx, project, assignedTo); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +83,7 @@ func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uu
 }
 
 func (s *service) GetTaskByID(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*TaskResponse, error) {
-	task, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
+	task, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +92,7 @@ func (s *service) GetTaskByID(ctx context.Context, taskID uuid.UUID, userID uuid
 }
 
 func (s *service) ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]TaskResponse, error) {
-	if _, err := s.verifyProjectOwner(ctx, projectID, userID); err != nil {
+	if _, err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +110,7 @@ func (s *service) ListTaskByProject(ctx context.Context, projectID uuid.UUID, us
 }
 
 func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req UpdateTaskRequest) (*TaskResponse, error) {
-	existingTask, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
+	existingTask, project, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +146,9 @@ func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 		if err != nil {
 			return nil, err
 		}
+		if err := s.validateAssignee(ctx, project, assignedTo); err != nil {
+			return nil, err
+		}
 		arg.AssignedTo = assignedTo
 	}
 
@@ -156,7 +165,7 @@ func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 }
 
 func (s *service) DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	if _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
+	if _, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
 		return err
 	}
 
@@ -167,30 +176,60 @@ func (s *service) DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 	return nil
 }
 
-func (s *service) verifyProjectOwner(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) (db.Project, error) {
+func (s *service) verifyProjectAccess(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) (db.Project, error) {
 	project, err := s.projectRepo.GetProjectByID(ctx, projectID)
 	if err != nil {
 		return db.Project{}, response.ErrNotFound("Project not found")
 	}
 
-	if project.OwnerID != userID {
+	if project.OwnerID == userID {
+		return project, nil
+	}
+
+	_, err = s.projectRepo.GetProjectMember(ctx, db.GetProjectMemberParams{
+		ProjectID: projectID,
+		UserID: userID,
+	})
+	if err != nil {
 		return db.Project{}, response.ErrForbidden("Unauthorized to access this project")
 	}
 
 	return project, nil
 }
 
-func (s *service) getTaskAndVerifyAccess(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (db.Task, error) {
+func (s *service) getTaskAndVerifyAccess(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (db.Task, db.Project, error) {
 	task, err := s.repo.GetTaskByID(ctx, taskID)
 	if err != nil {
-		return db.Task{}, response.ErrNotFound("Task not found")
+		return db.Task{}, db.Project{}, response.ErrNotFound("Task not found")
 	}
 
-	if _, err := s.verifyProjectOwner(ctx, task.ProjectID, userID); err != nil {
-		return db.Task{}, err
+	project, err := s.verifyProjectAccess(ctx, task.ProjectID, userID)
+	if err != nil {
+		return db.Task{}, db.Project{}, err
 	}
 
-	return task, nil
+	return task, project, nil
+}
+
+func (s *service) validateAssignee(ctx context.Context, project db.Project, assignedTo pgtype.UUID) error {
+	if !assignedTo.Valid {
+		return nil
+	}
+
+	assigneeID := uuid.UUID(assignedTo.Bytes)
+	if assigneeID == project.OwnerID {
+		return nil
+	}
+
+	_, err := s.projectRepo.GetProjectMember(ctx, db.GetProjectMemberParams{
+		ProjectID: project.ID,
+		UserID: assigneeID,
+	})
+	if err != nil {
+		return response.ErrBadRequest("Assignee is not a member of this project")
+	}
+
+	return nil
 }
 
 func toTaskResponse(t db.Task) *TaskResponse {
