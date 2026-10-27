@@ -325,25 +325,34 @@ Authorization: Bearer {{authToken}}
 
 
 ### =========================================================================
-### 7. CLEANUP / DELETE PROJECT
+### 7. ACTIVITY / AUDIT LOG MODULE
 ### =========================================================================
 
-### 7.1. Delete Project (Success)
+### 7.1. List Project Activity Logs (Success - Default Pagination)
+GET {{baseUrl}}/projects/{{projectId}}/activities?page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+
+### =========================================================================
+### 8. CLEANUP / DELETE PROJECT
+### =========================================================================
+
+### 8.1. Delete Project (Success)
 DELETE {{baseUrl}}/projects/{{projectId}}
 Authorization: Bearer {{authToken}}
 
-### 7.2. Get Deleted Project (Expected 404 Not Found)
+### 8.2. Get Deleted Project (Expected 404 Not Found)
 GET {{baseUrl}}/projects/{{projectId}}
 Authorization: Bearer {{authToken}}
 
 
 ### =========================================================================
-### 8. SECURITY & UNAUTHORIZED SCENARIOS
+### 9. SECURITY & UNAUTHORIZED SCENARIOS
 ### =========================================================================
 
-### 8.1. Access Protected Route Without Token (Expected 401 Unauthorized)
+### 9.1. Access Protected Route Without Token (Expected 401 Unauthorized)
 GET {{baseUrl}}/projects
 
-### 8.2. Access Protected Route With Invalid/Tampered Token (Expected 401 Unauthorized)
+### 9.2. Access Protected Route With Invalid/Tampered Token (Expected 401 Unauthorized)
 GET {{baseUrl}}/projects
 Authorization: Bearer invalid_jwt_token_here

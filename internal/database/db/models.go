@@ -9,6 +9,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ActivityLog struct {
+	ID         uuid.UUID          `json:"id"`
+	ProjectID  uuid.UUID          `json:"project_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Action     string             `json:"action"`
+	EntityType string             `json:"entity_type"`
+	EntityID   uuid.UUID          `json:"entity_id"`
+	Details    string             `json:"details"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type Comment struct {
 	ID        uuid.UUID          `json:"id"`
 	TaskID    uuid.UUID          `json:"task_id"`

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/khoirirrosikin/task-management/internal/activity"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
 	"github.com/khoirirrosikin/task-management/internal/response"
 )
@@ -25,13 +26,23 @@ type Service interface {
 	UpdateMemberRole(ctx context.Context, projectID uuid.UUID, ownerID uuid.UUID, memberID uuid.UUID, req UpdateMemberRoleRequest) (*MemberResponse, error)
 }
 
-type service struct {
-	repo Repository
+type ActivityLogger interface {
+	LogActivity(ctx context.Context, arg activity.LogParams)
 }
 
-func NewService(repo Repository) Service {
+type service struct {
+	repo Repository
+	activityLogger ActivityLogger
+}
+
+func NewService(repo Repository, loggers ...ActivityLogger) Service {
+	var logger ActivityLogger
+	if len(loggers) > 0 {
+		logger = loggers[0]
+	}
 	return &service{
 		repo: repo,
+		activityLogger: logger,
 	}
 }
 
@@ -49,6 +60,8 @@ func (s *service) CreateProject(ctx context.Context, ownerID uuid.UUID, req Crea
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create project: %w", err)
 	}
+
+	s.logActivity(ctx, project.ID, ownerID, "project_created", "project", project.ID, fmt.Sprintf("Created project %s", project.Name))
 
 	return toProjectResponse(project), nil
 }
@@ -95,6 +108,8 @@ func (s *service) UpdateProject(ctx context.Context, projectID uuid.UUID, ownerI
 	if err != nil {
 		return nil, fmt.Errorf("Failed to update project")
 	}
+
+	s.logActivity(ctx, projectID, ownerID, "project_updated", "project", projectID, fmt.Sprintf("Updated project '%s'", updated.Name))
 
 	return toProjectResponse(updated), nil
 }
@@ -157,6 +172,8 @@ func(s *service) AddMember(ctx context.Context, projectID uuid.UUID, ownerID uui
 		return nil, fmt.Errorf("Failed to add project member: %w", err)
 	}
 
+	s.logActivity(ctx, projectID, ownerID, "member_added", "member", user.ID, fmt.Sprintf("Added '%s' (%s) as %s", user.Name, user.Email, role))
+
 	return toMemberResponse(pm, user.Name, user.Email), nil
 }
 
@@ -214,6 +231,8 @@ func (s *service) RemoveMember(ctx context.Context, projectID uuid.UUID, ownerID
 		return fmt.Errorf("Failed to remove project member: %w", err)
 	}
 
+	s.logActivity(ctx, projectID, ownerID, "member_removed", "member", memberID, fmt.Sprintf("Removed member %s from project", memberID))
+
 	return nil
 }
 
@@ -238,6 +257,8 @@ func (s *service) UpdateMemberRole(ctx context.Context, projectID uuid.UUID, own
 		}
 		return nil, fmt.Errorf("Failed to update project member role: %w", err)
 	}
+
+	s.logActivity(ctx, projectID, ownerID, "member_role_updated", "member", memberID, fmt.Sprintf("Updated member %s role to '%s'", memberID, req.Role))
 
 	return toMemberResponse(pm, "", ""), nil
 
@@ -303,4 +324,18 @@ func toMemberResponse(pm db.ProjectMember, userName, userEmail string) *MemberRe
 		Role: pm.Role,
 		JoinedAt: pm.JoinedAt.Time,
 	}
+}
+
+func (s *service) logActivity(ctx context.Context, projectID, userID uuid.UUID, action, entityType string, entityID uuid.UUID, details string) {
+	if s.activityLogger == nil {
+		return
+	}
+	s.activityLogger.LogActivity(ctx, activity.LogParams{
+		ProjectID: projectID,
+		UserID: userID,
+		Action: action,
+		EntityType: entityType,
+		EntityID: entityID,
+		Details: details,
+	})
 }

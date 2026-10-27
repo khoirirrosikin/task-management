@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/khoirirrosikin/task-management/internal/activity"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
 	"github.com/khoirirrosikin/task-management/internal/notification"
 	"github.com/khoirirrosikin/task-management/internal/response"
@@ -29,6 +30,10 @@ type ProjectRepository interface {
 	GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error)
 }
 
+type ActivityLogger interface {
+	LogActivity(ctx context.Context, arg activity.LogParams)
+}
+
 type Notifier interface {
 	Enqueue(event notification.Event)
 }
@@ -37,17 +42,15 @@ type service struct {
 	repo        Repository
 	projectRepo ProjectRepository
 	notifier    Notifier
+	activityLogger ActivityLogger
 }
 
-func NewService(repo Repository, projectRepo ProjectRepository, notifiers ...Notifier) Service {
-	var notifier Notifier
-	if len(notifiers) > 0 {
-		notifier = notifiers[0]
-	}
+func NewService(repo Repository, projectRepo ProjectRepository, notifier Notifier, activityLogger ActivityLogger) Service {
 	return &service{
-		repo:        repo,
-		projectRepo: projectRepo,
-		notifier:    notifier,
+		repo:           repo,
+		projectRepo:    projectRepo,
+		notifier:       notifier,
+		activityLogger: activityLogger,
 	}
 }
 
@@ -104,6 +107,8 @@ func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uu
 			)
 		}
 	}
+
+	s.logActivity(ctx, projectID, userID, "task_created", "task", task.ID, fmt.Sprintf("Created task '%s'", task.Title))
 
 	return toTaskResponse(task), nil
 }
@@ -265,17 +270,22 @@ func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 		}
 	}
 
+	s.logActivity(ctx, project.ID, userID, "task_updated", "task", updated.ID, fmt.Sprintf("Updated task '%s' (status: %s, priority: %s)", updated.Title, updated.Status, updated.Priority))
+
 	return toTaskResponse(updated), nil
 }
 
 func (s *service) DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error {
-	if _, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
+	task, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
+	if err != nil {
 		return err
 	}
 
 	if err := s.repo.DeleteTask(ctx, taskID); err != nil {
 		return fmt.Errorf("Failed to delete task: %w", err)
 	}
+
+	s.logActivity(ctx, task.ProjectID, userID, "task_deleted", "task", taskID, fmt.Sprintf("Deleted task '%s'", task.Title))
 
 	return nil
 }
@@ -305,6 +315,8 @@ func (s *service) AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.
 			)
 		}
 	}
+
+	s.logActivity(ctx, task.ProjectID, userID, "comment_added", "comment", comment.ID, fmt.Sprintf("Added a comment on task '%s'", task.Title))
 
 	return &CommentResponse{
 		ID:        comment.ID.String(),
@@ -359,6 +371,8 @@ func (s *service) DeleteComment(ctx context.Context, taskID uuid.UUID, commentID
 	if err := s.repo.DeleteComment(ctx, commentID); err != nil {
 		return fmt.Errorf("Failed to delete comment: %w", err)
 	}
+
+	s.logActivity(ctx, project.ID, userID, "comment_deleted", "comment", commentID, "Deleted a comment")
 
 	return nil
 }
@@ -480,5 +494,19 @@ func (s *service) notify(userID uuid.UUID, title, message string) {
 		UserID: userID,
 		Title: title,
 		Message: message,
+	})
+}
+
+func (s *service) logActivity(ctx context.Context, projectID, userID uuid.UUID, action, entityType string, entityID uuid.UUID, details string) {
+	if s.activityLogger == nil {
+		return
+	}
+	s.activityLogger.LogActivity(ctx, activity.LogParams{
+		ProjectID:  projectID,
+		UserID:     userID,
+		Action:     action,
+		EntityType: entityType,
+		EntityID:   entityID,
+		Details:    details,
 	})
 }

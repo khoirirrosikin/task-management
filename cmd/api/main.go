@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/khoirirrosikin/task-management/internal/activity"
 	"github.com/khoirirrosikin/task-management/internal/auth"
 	"github.com/khoirirrosikin/task-management/internal/database"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
@@ -54,11 +55,16 @@ func main() {
 	authHandler := auth.NewHandler(authService)
 
 	projectRepo := project.NewRepository(queries)
-	projectService := project.NewService(projectRepo)
+
+	activityRepo := activity.NewRepository(queries)
+	activityService := activity.NewService(activityRepo, projectRepo)
+	activityHandler := activity.NewHandler(activityService)
+
+	projectService := project.NewService(projectRepo, activityService)
 	projectHandler := project.NewHandler(projectService)
 
 	taskRepo := task.NewRepository(queries)
-	taskService := task.NewService(taskRepo, projectRepo, notificationService)
+	taskService := task.NewService(taskRepo, projectRepo, notificationService, activityService)
 	taskHandler := task.NewHandler(taskService)
 
 	authMiddleware := middleware.AuthMiddleware(jwtSecret)
@@ -74,6 +80,7 @@ func main() {
 	projectHandler.RegisterRoutes(v1, authMiddleware)
 	taskHandler.RegisterRoutes(v1, authMiddleware)
 	notificationHandler.RegisterRoutes(v1, authMiddleware)
+	activityHandler.RegisterRoutes(v1, authMiddleware)
 
 	srv := &http.Server{
 		Addr: ":" + port,

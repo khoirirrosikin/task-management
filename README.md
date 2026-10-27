@@ -75,6 +75,13 @@ task-management/
 │   │   ├── repository.go           # Database operations interface & implementation
 │   │   ├── service.go              # Buffered channel queue & background worker
 │   │   └── service_test.go         # Unit tests for worker & service logic
+│   ├── activity/                   # Audit / Activity log module
+│   │   ├── dto.go                  # Activity log DTOs
+│   │   ├── handler.go              # Gin HTTP handlers
+│   │   ├── handler_test.go         # Unit tests for HTTP handlers
+│   │   ├── repository.go           # Database operations interface & implementation
+│   │   ├── service.go              # Activity logging & project audit trail logic
+│   │   └── service_test.go         # Unit tests for activity service
 │   ├── middleware/                 # Shared middlewares (Auth JWT, CORS, Logger)
 │   │   ├── auth.go                 # JWT authentication middleware
 │   │   └── auth_test.go            # Unit tests for JWT auth middleware
@@ -92,7 +99,8 @@ task-management/
 │           ├── tasks.sql.go
 │           ├── project_members.sql.go
 │           ├── comments.sql.go
-│           └── notifications.sql.go
+│           ├── notifications.sql.go
+│           └── activity_logs.sql.go
 ├── sql/
 │   ├── migrations/                 # Versioned DDL migrations for goose
 │   │   ├── 00001_create_users_table.sql
@@ -100,14 +108,16 @@ task-management/
 │   │   ├── 00003_create_tasks_table.sql
 │   │   ├── 00004_create_project_members_table.sql
 │   │   ├── 00005_create_comments_table.sql
-│   │   └── 00006_create_notifications_table.sql
+│   │   ├── 00006_create_notifications_table.sql
+│   │   └── 00007_create_activity_logs_table.sql
 │   └── queries/                    # Raw SQL queries for sqlc
 │       ├── users.sql
 │       ├── projects.sql
 │       ├── tasks.sql
 │       ├── project_members.sql
 │       ├── comments.sql
-│       └── notifications.sql
+│       ├── notifications.sql
+│       └── activity_logs.sql
 ├── api.http                        # REST Client HTTP test scenarios for live testing
 ├── docker-compose.yml              # Local PostgreSQL container definition
 ├── sqlc.yaml                       # sqlc code generation configuration
@@ -146,9 +156,9 @@ task-management/
 - [x] Task assignment validation to project members
 - [x] Task comments & discussions (`00005_create_comments_table.sql`, `/api/v1/tasks/:id/comments`)
 
-### Phase 3 — Advanced Value (Portfolio Standout)
+### Phase 3 — Advanced Value (Completed)
 - [x] Asynchronous task notification system using Go goroutines & channels
-- [ ] Audit / Activity log (who modified what and when)
+- [x] Audit / Activity log (who modified what and when)
 - [x] Search & filtering for tasks (`status`, `priority`, `assignee`, `due_date`)
 - [x] Offset / Cursor pagination for list endpoints
 
@@ -166,6 +176,8 @@ erDiagram
     TASKS ||--o{ COMMENTS : "has"
     USERS ||--o{ COMMENTS : "authors"
     USERS ||--o{ NOTIFICATIONS : "receives"
+    PROJECTS ||--o{ ACTIVITY_LOGS : "tracks"
+    USERS ||--o{ ACTIVITY_LOGS : "performs"
 
     USERS {
         uuid id PK "gen_random_uuid()"
@@ -220,6 +232,17 @@ erDiagram
         varchar title
         text message
         boolean is_read
+        timestamptz created_at
+    }
+
+    ACTIVITY_LOGS {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        varchar action
+        varchar entity_type
+        uuid entity_id
+        text details
         timestamptz created_at
     }
 ```
@@ -285,6 +308,7 @@ go test -v ./internal/auth
 go test -v ./internal/project
 go test -v ./internal/task
 go test -v ./internal/notification
+go test -v ./internal/activity
 go test -v ./internal/middleware
 ```
 
@@ -294,6 +318,7 @@ go test -cover ./internal/auth
 go test -cover ./internal/project
 go test -cover ./internal/task
 go test -cover ./internal/notification
+go test -cover ./internal/activity
 go test -cover ./internal/middleware
 ```
 
@@ -800,6 +825,38 @@ go test -cover ./internal/middleware
 {
   "success": true,
   "message": "All notifications marked as read"
+}
+```
+
+### List Project Activity Logs
+- **Endpoint:** `GET /api/v1/projects/:id/activities`
+- **Query Params (Optional):** `page` (default: `1`), `limit` (default: `10`, max: `100`)
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Activity logs retrieved successfully",
+  "data": [
+    {
+      "id": "5f6a7b8c-1234-4ec5-b286-d24eef6ff2aa",
+      "project_id": "c1f7a012-6874-4ec5-b286-d24eef6ff2aa",
+      "user_id": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+      "user_name": "Khoirir Rosikin",
+      "user_email": "khoirir.rosikin@gmail.com",
+      "action": "task_created",
+      "entity_type": "task",
+      "entity_id": "e4b52c01-7fa1-42cb-b72e-c1214a1a679e",
+      "details": "Created task 'Setup database migrations'",
+      "created_at": "2026-10-27T21:15:00Z"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
 }
 ```
 

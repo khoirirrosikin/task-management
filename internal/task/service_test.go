@@ -85,7 +85,7 @@ func (m *MockProjectRepository) GetProjectMember(ctx context.Context, arg db.Get
 func TestCreateTask_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	userID := uuid.New()
 	projectID := uuid.New()
@@ -153,7 +153,7 @@ func TestCreateTask_Success(t *testing.T) {
 func TestCreateTask_Success_DefaultValues(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	userID := uuid.New()
 	projectID := uuid.New()
@@ -195,7 +195,7 @@ func TestCreateTask_Success_DefaultValues(t *testing.T) {
 func TestCreateTask_ProjectNotFound(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	userID := uuid.New()
@@ -215,7 +215,7 @@ func TestCreateTask_ProjectNotFound(t *testing.T) {
 func TestCreateTask_UnauthorizedProject(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	userID := uuid.New()
@@ -243,7 +243,7 @@ func TestCreateTask_UnauthorizedProject(t *testing.T) {
 func TestCreateTask_InvalidAssigneeUUID(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	userID := uuid.New()
@@ -272,7 +272,7 @@ func TestCreateTask_InvalidAssigneeUUID(t *testing.T) {
 func TestGetTaskByID_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -304,7 +304,7 @@ func TestGetTaskByID_Success(t *testing.T) {
 func TestGetTaskByID_NotFound(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	userID := uuid.New()
@@ -324,7 +324,7 @@ func TestGetTaskByID_NotFound(t *testing.T) {
 func TestListTaskByProject_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	userID := uuid.New()
@@ -372,7 +372,7 @@ func TestListTaskByProject_Success(t *testing.T) {
 func TestListTaskByProject_WithFiltersAndPagination(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	userID := uuid.New()
@@ -436,7 +436,7 @@ func TestListTaskByProject_WithFiltersAndPagination(t *testing.T) {
 func TestUpdateTask_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -488,7 +488,7 @@ func TestUpdateTask_Success(t *testing.T) {
 func TestDeleteTask_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -511,7 +511,7 @@ func TestDeleteTask_Success(t *testing.T) {
 func TestCreateTask_AssigneeNotMember(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	ownerID := uuid.New()
@@ -546,7 +546,7 @@ func TestCreateTask_AssigneeNotMember(t *testing.T) {
 func TestCreateTask_Success_ByProjectMember(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	projectID := uuid.New()
 	ownerID := uuid.New()
@@ -595,7 +595,7 @@ func TestCreateTask_Success_ByProjectMember(t *testing.T) {
 func TestUpdateTask_AssigneeNotMember(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -640,7 +640,7 @@ func TestUpdateTask_AssigneeNotMember(t *testing.T) {
 func TestAddComment_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -682,7 +682,7 @@ func TestAddComment_Success(t *testing.T) {
 func TestListComments_Success(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -720,7 +720,7 @@ func TestListComments_Success(t *testing.T) {
 func TestDeleteComment_Success_ByAuthor(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
@@ -755,7 +755,7 @@ func TestDeleteComment_Success_ByAuthor(t *testing.T) {
 func TestDeleteComment_Forbidden_OtherMember(t *testing.T) {
 	mockTaskRepo := new(MockTaskRepository)
 	mockProjectRepo := new(MockProjectRepository)
-	service := NewService(mockTaskRepo, mockProjectRepo)
+	service := NewService(mockTaskRepo, mockProjectRepo, nil, nil)
 
 	taskID := uuid.New()
 	projectID := uuid.New()
