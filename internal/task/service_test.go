@@ -28,9 +28,14 @@ func (m *MockTaskRepository) GetTaskByID(ctx context.Context, id uuid.UUID) (db.
 	return args.Get(0).(db.Task), args.Error(1)
 }
 
-func (m *MockTaskRepository) ListTaskByProject(ctx context.Context, projectID uuid.UUID) ([]db.Task, error) {
-	args := m.Called(ctx, projectID)
+func (m *MockTaskRepository) ListTaskByProject(ctx context.Context, arg db.ListTaskByProjectParams) ([]db.Task, error) {
+	args := m.Called(ctx, arg)
 	return args.Get(0).([]db.Task), args.Error(1)
+}
+
+func (m *MockTaskRepository) CountTasksByProject(ctx context.Context, arg db.CountTasksByProjectParams) (int64, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func (m *MockTaskRepository) UpdateTask(ctx context.Context, arg db.UpdateTaskParams) (db.Task, error) {
@@ -341,13 +346,91 @@ func TestListTaskByProject_Success(t *testing.T) {
 	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).
 		Return(mockProject, nil)
 
-	mockTaskRepo.On("ListTaskByProject", mock.Anything, projectID).
-		Return(mockTasks, nil)
+	mockTaskRepo.On("CountTasksByProject", mock.Anything, db.CountTasksByProjectParams{
+		ProjectID: projectID,
+	}).Return(int64(2), nil)
 
-	res, err := service.ListTaskByProject(context.Background(), projectID, userID)
+	mockTaskRepo.On("ListTaskByProject", mock.Anything, db.ListTaskByProjectParams{
+		ProjectID: projectID,
+		Limit:     10,
+		Offset:    0,
+	}).Return(mockTasks, nil)
+
+	res, meta, err := service.ListTaskByProject(context.Background(), projectID, userID, TaskFilterQuery{})
 
 	assert.NoError(t, err)
 	assert.Len(t, res, 2)
+	assert.NotNil(t, meta)
+	assert.Equal(t, 1, meta.CurrentPage)
+	assert.Equal(t, 10, meta.PerPage)
+	assert.Equal(t, int64(2), meta.TotalItems)
+	assert.Equal(t, 1, meta.TotalPages)
+	mockProjectRepo.AssertExpectations(t)
+	mockTaskRepo.AssertExpectations(t)
+}
+
+func TestListTaskByProject_WithFiltersAndPagination(t *testing.T) {
+	mockTaskRepo := new(MockTaskRepository)
+	mockProjectRepo := new(MockProjectRepository)
+	service := NewService(mockTaskRepo, mockProjectRepo)
+
+	projectID := uuid.New()
+	userID := uuid.New()
+	assigneeID := uuid.New()
+	assigneeStr := assigneeID.String()
+
+	mockProject := db.Project{
+		ID:      projectID,
+		OwnerID: userID,
+	}
+
+	filter := TaskFilterQuery{
+		Search:     "bug",
+		Status:     "in_progress",
+		Priority:   "high",
+		AssignedTo: &assigneeStr,
+		Page:       2,
+		Limit:      5,
+	}
+
+	mockTasks := []db.Task{
+		{
+			ID: uuid.New(), ProjectID: projectID, Title: "Fix login bug", Status: "in_progress", Priority: "high",
+		},
+	}
+
+	mockProjectRepo.On("GetProjectByID", mock.Anything, projectID).
+		Return(mockProject, nil)
+
+	mockTaskRepo.On("CountTasksByProject", mock.Anything, db.CountTasksByProjectParams{
+		ProjectID:  projectID,
+		Status:     pgtype.Text{String: "in_progress", Valid: true},
+		Priority:   pgtype.Text{String: "high", Valid: true},
+		AssignedTo: pgtype.UUID{Bytes: assigneeID, Valid: true},
+		Search:     pgtype.Text{String: "bug", Valid: true},
+	}).Return(int64(6), nil)
+
+	mockTaskRepo.On("ListTaskByProject", mock.Anything, db.ListTaskByProjectParams{
+		ProjectID:  projectID,
+		Limit:      5,
+		Offset:     5,
+		Status:     pgtype.Text{String: "in_progress", Valid: true},
+		Priority:   pgtype.Text{String: "high", Valid: true},
+		AssignedTo: pgtype.UUID{Bytes: assigneeID, Valid: true},
+		Search:     pgtype.Text{String: "bug", Valid: true},
+	}).Return(mockTasks, nil)
+
+	res, meta, err := service.ListTaskByProject(context.Background(), projectID, userID, filter)
+
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+	assert.NotNil(t, meta)
+	assert.Equal(t, 2, meta.CurrentPage)
+	assert.Equal(t, 5, meta.PerPage)
+	assert.Equal(t, int64(6), meta.TotalItems)
+	assert.Equal(t, 2, meta.TotalPages)
+	mockProjectRepo.AssertExpectations(t)
+	mockTaskRepo.AssertExpectations(t)
 }
 
 func TestUpdateTask_Success(t *testing.T) {

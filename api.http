@@ -228,8 +228,16 @@ Authorization: Bearer {{authToken}}
   "assigned_to": "00000000-0000-0000-0000-000000000001"
 }
 
-### 5.5. List Tasks by Project (Success)
+### 5.5. List Tasks by Project (Success - Default Pagination)
 GET {{baseUrl}}/projects/{{projectId}}/tasks
+Authorization: Bearer {{authToken}}
+
+### 5.5.1. List Tasks with Search, Filter & Pagination (Success)
+GET {{baseUrl}}/projects/{{projectId}}/tasks?search=Schema&status=todo&priority=high&page=1&limit=5
+Authorization: Bearer {{authToken}}
+
+### 5.5.2. List Tasks with Invalid Filter (Validation Error - Expected 400 Bad Request)
+GET {{baseUrl}}/projects/{{projectId}}/tasks?status=invalid_status
 Authorization: Bearer {{authToken}}
 
 ### 5.6. Get Task by ID (Success)

@@ -10,7 +10,8 @@ import (
 type Repository interface {
 	CreateTask(ctx context.Context, arg db.CreateTaskParams) (db.Task, error)
 	GetTaskByID(ctx context.Context, id uuid.UUID) (db.Task, error)
-	ListTaskByProject(ctx context.Context, projectID uuid.UUID) ([]db.Task, error)
+	ListTaskByProject(ctx context.Context, arg db.ListTaskByProjectParams) ([]db.Task, error)
+	CountTasksByProject(ctx context.Context, arg db.CountTasksByProjectParams) (int64, error)
 	UpdateTask(ctx context.Context, arg db.UpdateTaskParams) (db.Task, error)
 	DeleteTask(ctx context.Context, id uuid.UUID) error
 
@@ -38,8 +39,12 @@ func (r *repository) GetTaskByID(ctx context.Context, id uuid.UUID) (db.Task, er
 	return r.queries.GetTaskByID(ctx, id)
 }
 
-func (r *repository) ListTaskByProject(ctx context.Context, projectID uuid.UUID) ([]db.Task, error) {
-	return r.queries.ListTaskByProject(ctx, projectID)
+func (r *repository) ListTaskByProject(ctx context.Context, arg db.ListTaskByProjectParams) ([]db.Task, error) {
+	return r.queries.ListTaskByProject(ctx, arg)
+}
+
+func (r *repository) CountTasksByProject(ctx context.Context, arg db.CountTasksByProjectParams) (int64, error) {
+	return r.queries.CountTasksByProject(ctx, arg)
 }
 
 func (r *repository) UpdateTask(ctx context.Context, arg db.UpdateTaskParams) (db.Task, error) {

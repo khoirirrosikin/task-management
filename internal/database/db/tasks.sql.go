@@ -12,6 +12,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countTasksByProject = `-- name: CountTasksByProject :one
+SELECT COUNT(*) FROM tasks
+WHERE project_id = $1
+    AND ($2::varchar IS NULL OR status = $2)
+    AND ($3::varchar IS NULL OR priority = $3)
+    AND ($4::uuid IS NULL OR assigned_to = $4)
+    AND ($5::timestamptz IS NULL OR due_date <= $5)
+    AND ($6::varchar IS NULL OR title ILIKE '%' || $6 || '%' OR description ILIKE '%' || $6 || '%')
+`
+
+type CountTasksByProjectParams struct {
+	ProjectID  uuid.UUID          `json:"project_id"`
+	Status     pgtype.Text        `json:"status"`
+	Priority   pgtype.Text        `json:"priority"`
+	AssignedTo pgtype.UUID        `json:"assigned_to"`
+	DueBefore  pgtype.Timestamptz `json:"due_before"`
+	Search     pgtype.Text        `json:"search"`
+}
+
+func (q *Queries) CountTasksByProject(ctx context.Context, arg CountTasksByProjectParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTasksByProject,
+		arg.ProjectID,
+		arg.Status,
+		arg.Priority,
+		arg.AssignedTo,
+		arg.DueBefore,
+		arg.Search,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
     project_id, title, description, status, priority, assigned_to, due_date
@@ -92,11 +125,37 @@ func (q *Queries) GetTaskByID(ctx context.Context, id uuid.UUID) (Task, error) {
 const listTaskByProject = `-- name: ListTaskByProject :many
 SELECT id, project_id, title, description, status, priority, assigned_to, due_date, created_at, updated_at FROM tasks
 WHERE project_id = $1
+    AND ($4::varchar IS NULL OR status = $4)
+    AND ($5::varchar IS NULL OR priority = $5)
+    AND ($6::uuid IS NULL OR assigned_to = $6)
+    AND ($7::timestamptz IS NULL OR due_date <= $7)
+    AND ($8::varchar IS NULL OR title ILIKE '%' || $8 || '%' OR description ILIKE '%' || $8 || '%')
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListTaskByProject(ctx context.Context, projectID uuid.UUID) ([]Task, error) {
-	rows, err := q.db.Query(ctx, listTaskByProject, projectID)
+type ListTaskByProjectParams struct {
+	ProjectID  uuid.UUID          `json:"project_id"`
+	Limit      int32              `json:"limit"`
+	Offset     int32              `json:"offset"`
+	Status     pgtype.Text        `json:"status"`
+	Priority   pgtype.Text        `json:"priority"`
+	AssignedTo pgtype.UUID        `json:"assigned_to"`
+	DueBefore  pgtype.Timestamptz `json:"due_before"`
+	Search     pgtype.Text        `json:"search"`
+}
+
+func (q *Queries) ListTaskByProject(ctx context.Context, arg ListTaskByProjectParams) ([]Task, error) {
+	rows, err := q.db.Query(ctx, listTaskByProject,
+		arg.ProjectID,
+		arg.Limit,
+		arg.Offset,
+		arg.Status,
+		arg.Priority,
+		arg.AssignedTo,
+		arg.DueBefore,
+		arg.Search,
+	)
 	if err != nil {
 		return nil, err
 	}

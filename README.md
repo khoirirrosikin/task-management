@@ -139,8 +139,8 @@ task-management/
 ### Phase 3 — Advanced Value (Portfolio Standout)
 - [ ] Asynchronous task notification system using Go goroutines & channels
 - [ ] Audit / Activity log (who modified what and when)
-- [ ] Search & filtering for tasks (`status`, `priority`, `assignee`, `due_date`)
-- [ ] Offset / Cursor pagination for list endpoints
+- [x] Search & filtering for tasks (`status`, `priority`, `assignee`, `due_date`)
+- [x] Offset / Cursor pagination for list endpoints
 
 ---
 
@@ -561,8 +561,16 @@ go test -cover ./internal/task
 }
 ```
 
-### List Tasks by Project
+### List Tasks by Project (with Search, Filter & Pagination)
 - **Endpoint:** `GET /api/v1/projects/:projectId/tasks`
+- **Query Params (Optional):**
+  - `search`: Filter by keyword in title or description (case-insensitive)
+  - `status`: `todo` | `in_progress` | `completed`
+  - `priority`: `low` | `medium` | `high` | `urgent`
+  - `assigned_to`: Assignee user UUID
+  - `due_before`: RFC3339 timestamp (e.g., `2026-10-31T23:59:59Z`)
+  - `page`: Page number (default: `1`)
+  - `limit`: Items per page (default: `10`, max: `100`)
 - **Headers:** `Authorization: Bearer <token>`
 - **Response:** `200 OK`
 ```json
@@ -582,7 +590,13 @@ go test -cover ./internal/task
       "created_at": "2026-10-03T12:00:00Z",
       "updated_at": "2026-10-03T12:00:00Z"
     }
-  ]
+  ],
+  "meta": {
+    "current_page": 1,
+    "per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
 }
 ```
 

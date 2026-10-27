@@ -14,7 +14,7 @@ import (
 type Service interface {
 	CreateTask(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, req CreateTaskRequest) (*TaskResponse, error)
 	GetTaskByID(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*TaskResponse, error)
-	ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]TaskResponse, error)
+	ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, filter TaskFilterQuery) ([]TaskResponse, *response.PaginationMeta, error)
 	UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req UpdateTaskRequest) (*TaskResponse, error)
 	DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) error
 
@@ -95,14 +95,68 @@ func (s *service) GetTaskByID(ctx context.Context, taskID uuid.UUID, userID uuid
 	return toTaskResponse(task), nil
 }
 
-func (s *service) ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]TaskResponse, error) {
+func (s *service) ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, filter TaskFilterQuery) ([]TaskResponse, *response.PaginationMeta, error) {
 	if _, err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	tasks, err := s.repo.ListTaskByProject(ctx, projectID)
+	assignedTo, err := parseAssignedTo(filter.AssignedTo)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list tasks: %w", err)
+		return nil, nil, err
+	}
+
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	offset := (page - 1) * limit
+
+	status := pgtype.Text{
+		String: filter.Status,
+		Valid: filter.Status != "",
+	}
+	priority := pgtype.Text{
+		String: filter.Priority,
+		Valid: filter.Priority != "",
+	}
+	search := pgtype.Text{
+		String: filter.Search,
+		Valid: filter.Search != "",
+	}
+	dueBefore := parseDueDate(filter.DueBefore)
+
+	totalItems, err := s.repo.CountTasksByProject(ctx, db.CountTasksByProjectParams{
+		ProjectID: projectID,
+		Status: status,
+		Priority: priority,
+		AssignedTo: assignedTo,
+		DueBefore: dueBefore,
+		Search: search,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to count tasks: %w", err)
+	}
+
+	tasks, err := s.repo.ListTaskByProject(ctx, db.ListTaskByProjectParams{
+		ProjectID: projectID,
+		Limit: int32(limit),
+		Offset: int32(offset),
+		Status: status,
+		Priority: priority,
+		AssignedTo: assignedTo,
+		DueBefore: dueBefore,
+		Search: search,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to list tasks: %w", err)
 	}
 
 	responses := make([]TaskResponse, len(tasks))
@@ -110,7 +164,19 @@ func (s *service) ListTaskByProject(ctx context.Context, projectID uuid.UUID, us
 		responses[i] = *toTaskResponse(t)
 	}
 
-	return responses, nil
+	totalPages := 0
+	if totalItems > 0 {
+		totalPages = (int(totalItems) + limit -1) / limit
+	}
+
+	meta := &response.PaginationMeta{
+		CurrentPage: page,
+		PerPage: limit,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+	}
+
+	return responses, meta, nil
 }
 
 func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req UpdateTaskRequest) (*TaskResponse, error) {

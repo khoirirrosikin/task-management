@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -38,12 +37,16 @@ func (m *MockService) GetTaskByID(ctx context.Context, taskID uuid.UUID, userID 
 	return args.Get(0).(*TaskResponse), args.Error(1)
 }
 
-func (m *MockService) ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) ([]TaskResponse, error) {
-	args := m.Called(ctx, projectID, userID)
+func (m *MockService) ListTaskByProject(ctx context.Context, projectID uuid.UUID, userID uuid.UUID, filter TaskFilterQuery) ([]TaskResponse, *response.PaginationMeta, error) {
+	args := m.Called(ctx, projectID, userID, filter)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, nil, args.Error(2)
 	}
-	return args.Get(0).([]TaskResponse), args.Error(1)
+	var meta *response.PaginationMeta
+	if args.Get(1) != nil {
+		meta = args.Get(1).(*response.PaginationMeta)
+	}
+	return args.Get(0).([]TaskResponse), meta, args.Error(2)
 }
 
 func (m *MockService) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req UpdateTaskRequest) (*TaskResponse, error) {
@@ -232,8 +235,15 @@ func TestHandler_ListTasks_Success(t *testing.T) {
 		},
 	}
 
-	mockService.On("ListTaskByProject", mock.Anything, projectID, testUserID).
-		Return(expectedResponse, nil)
+	expectedMeta := &response.PaginationMeta{
+		CurrentPage: 1,
+		PerPage:     10,
+		TotalItems:  2,
+		TotalPages:  1,
+	}
+
+	mockService.On("ListTaskByProject", mock.Anything, projectID, testUserID, TaskFilterQuery{}).
+		Return(expectedResponse, expectedMeta, nil)
 
 	url := "/api/v1/projects/" + projectID.String() + "/tasks"
 	w := performRequest(router, http.MethodGet, url, nil)
@@ -246,7 +256,65 @@ func TestHandler_ListTasks_Success(t *testing.T) {
 	assert.True(t, res.Success)
 	assert.Equal(t, "Tasks retrieved successfully", res.Message)
 	assert.Len(t, res.Data, len(expectedResponse))
+	assert.NotNil(t, res.Meta)
 	mockService.AssertExpectations(t)
+}
+
+func TestHandler_ListTasks_WithQueryParams(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	expectedFilter := TaskFilterQuery{
+		Search:   "urgent",
+		Status:   "todo",
+		Priority: "high",
+		Page:     2,
+		Limit:    5,
+	}
+
+	expectedResponse := []TaskResponse{}
+	expectedMeta := &response.PaginationMeta{
+		CurrentPage: 2,
+		PerPage:     5,
+		TotalItems:  0,
+		TotalPages:  0,
+	}
+
+	mockService.On("ListTaskByProject", mock.Anything, projectID, testUserID, expectedFilter).
+		Return(expectedResponse, expectedMeta, nil)
+
+	url := "/api/v1/projects/" + projectID.String() + "/tasks?search=urgent&status=todo&priority=high&page=2&limit=5"
+	w := performRequest(router, http.MethodGet, url, nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.True(t, res.Success)
+	assert.NotNil(t, res.Meta)
+	mockService.AssertExpectations(t)
+}
+
+func TestHandler_ListTasks_ValidationError(t *testing.T) {
+	mockService := new(MockService)
+	testUserID := uuid.New()
+	projectID := uuid.New()
+	router := setupTestRouter(mockService, testUserID)
+
+	url := "/api/v1/projects/" + projectID.String() + "/tasks?status=invalid_status"
+	w := performRequest(router, http.MethodGet, url, nil)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var res response.APIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	assert.NoError(t, err)
+	assert.False(t, res.Success)
+	assert.Equal(t, "Validation error", res.Message)
+	mockService.AssertNotCalled(t, "ListTaskByProject")
 }
 
 func TestHandler_ListTasks_InvalidProjectID(t *testing.T) {
@@ -254,9 +322,6 @@ func TestHandler_ListTasks_InvalidProjectID(t *testing.T) {
 	testUserID := uuid.New()
 	projectID := "invalid-uuid"
 	router := setupTestRouter(mockService, testUserID)
-
-	mockService.On("ListTaskByProject", mock.Anything, projectID, testUserID).
-		Return(nil, errors.New("invalid project ID"))
 
 	url := "/api/v1/projects/" + projectID + "/tasks"
 	w := performRequest(router, http.MethodGet, url, nil)

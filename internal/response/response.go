@@ -8,7 +8,15 @@ type APIResponse struct {
 	Success bool `json:"success"`
 	Message string `json:"message"`
 	Data any `json:"data,omitempty"`
+	Meta any `json:"meta,omitempty"`
 	Error any `json:"error,omitempty"`
+}
+
+type PaginationMeta struct {
+	CurrentPage int `json:"current_page"`
+	PerPage int `json:"per_page"`
+	TotalItems int64 `json:"total_items"`
+	TotalPages int `json:"total_pages"`
 }
 
 func Success(c *gin.Context, statusCode int, message string, data any){
@@ -17,6 +25,15 @@ func Success(c *gin.Context, statusCode int, message string, data any){
 		Message: message,
 		Data: data,
 	})	
+}
+
+func SuccessWithMeta(c *gin.Context, statusCode int, message string, data any, meta any) {
+	c.JSON(statusCode, APIResponse{
+		Success: true,
+		Message: message,
+		Data: data,
+		Meta: meta,
+	})
 }
 
 func Error(c *gin.Context, statusCode int, message string, err any){

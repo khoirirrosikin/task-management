@@ -46,3 +46,13 @@ type CommentResponse struct {
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type TaskFilterQuery struct {
+	Search string `form:"search" binding:"omitempty,max=100"`
+	Status string `form:"status" binding:"omitempty,oneof=todo in_progress completed"`
+	Priority string `form:"priority" binding:"omitempty,oneof=low medium high urgent"`
+	AssignedTo *string `form:"assigned_to" binding:"omitempty,uuid"`
+	DueBefore *time.Time `form:"due_before" time_format:"2006-01-02T15:04:05Z07:00"`
+	Page int `form:"page" binding:"omitempty,min=1"`
+	Limit int `form:"limit" binding:"omitempty,min=1,max=100"`
+}

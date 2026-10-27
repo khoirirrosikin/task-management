@@ -70,15 +70,21 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		return
 	}
 
+	var filter TaskFilterQuery
+	if err := c.ShouldBindQuery(&filter); err != nil {
+		response.Error(c, http.StatusBadRequest, "Validation error", response.FormatValidationError(err))
+		return
+	}
+
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	res, err := h.service.ListTaskByProject(c.Request.Context(), projectID, userID)
+	res, meta, err := h.service.ListTaskByProject(c.Request.Context(), projectID, userID, filter)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "Tasks retrieved successfully", res)
+	response.SuccessWithMeta(c, http.StatusOK, "Tasks retrieved successfully", res, meta)
 }
 
 func (h *Handler) GetTaskByID(c *gin.Context) {
