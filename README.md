@@ -68,6 +68,13 @@ task-management/
 │   │   ├── repository.go           # Database operations interface & implementation
 │   │   ├── service.go              # Business logic & access verification
 │   │   └── service_test.go         # Unit tests with mock repositories
+│   ├── notification/               # Async notification module (Goroutines & Channels)
+│   │   ├── dto.go                  # Notification event & response DTOs
+│   │   ├── handler.go              # Gin HTTP handlers
+│   │   ├── handler_test.go         # Unit tests for HTTP handlers
+│   │   ├── repository.go           # Database operations interface & implementation
+│   │   ├── service.go              # Buffered channel queue & background worker
+│   │   └── service_test.go         # Unit tests for worker & service logic
 │   ├── middleware/                 # Shared middlewares (Auth JWT, CORS, Logger)
 │   │   ├── auth.go                 # JWT authentication middleware
 │   │   └── auth_test.go            # Unit tests for JWT auth middleware
@@ -84,20 +91,23 @@ task-management/
 │           ├── projects.sql.go
 │           ├── tasks.sql.go
 │           ├── project_members.sql.go
-│           └── comments.sql.go
+│           ├── comments.sql.go
+│           └── notifications.sql.go
 ├── sql/
 │   ├── migrations/                 # Versioned DDL migrations for goose
 │   │   ├── 00001_create_users_table.sql
 │   │   ├── 00002_create_projects_table.sql
 │   │   ├── 00003_create_tasks_table.sql
 │   │   ├── 00004_create_project_members_table.sql
-│   │   └── 00005_create_comments_table.sql
+│   │   ├── 00005_create_comments_table.sql
+│   │   └── 00006_create_notifications_table.sql
 │   └── queries/                    # Raw SQL queries for sqlc
 │       ├── users.sql
 │       ├── projects.sql
 │       ├── tasks.sql
 │       ├── project_members.sql
-│       └── comments.sql
+│       ├── comments.sql
+│       └── notifications.sql
 ├── api.http                        # REST Client HTTP test scenarios for live testing
 ├── docker-compose.yml              # Local PostgreSQL container definition
 ├── sqlc.yaml                       # sqlc code generation configuration
@@ -137,7 +147,7 @@ task-management/
 - [x] Task comments & discussions (`00005_create_comments_table.sql`, `/api/v1/tasks/:id/comments`)
 
 ### Phase 3 — Advanced Value (Portfolio Standout)
-- [ ] Asynchronous task notification system using Go goroutines & channels
+- [x] Asynchronous task notification system using Go goroutines & channels
 - [ ] Audit / Activity log (who modified what and when)
 - [x] Search & filtering for tasks (`status`, `priority`, `assignee`, `due_date`)
 - [x] Offset / Cursor pagination for list endpoints
@@ -155,6 +165,7 @@ erDiagram
     USERS ||--o{ TASKS : "assigned to"
     TASKS ||--o{ COMMENTS : "has"
     USERS ||--o{ COMMENTS : "authors"
+    USERS ||--o{ NOTIFICATIONS : "receives"
 
     USERS {
         uuid id PK "gen_random_uuid()"
@@ -200,6 +211,15 @@ erDiagram
         uuid task_id FK
         uuid user_id FK
         text content
+        timestamptz created_at
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        varchar title
+        text message
+        boolean is_read
         timestamptz created_at
     }
 ```
@@ -718,6 +738,64 @@ go test -cover ./internal/task
 {
   "success": true,
   "message": "Comment deleted successfully"
+}
+```
+
+### List User Notifications
+- **Endpoint:** `GET /api/v1/notifications`
+- **Query Params (Optional):** `page` (default: `1`), `limit` (default: `10`, max: `100`)
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Notifications retrieved successfully",
+  "data": [
+    {
+      "id": "1d2e3f4a-5678-4ec5-b286-d24eef6ff2aa",
+      "user_id": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+      "title": "New Task Assigned",
+      "message": "You have been assigned to task 'Setup database migrations' in project 'Task Management API'",
+      "is_read": false,
+      "created_at": "2026-10-27T20:30:00Z"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
+}
+```
+
+### Mark Notification as Read
+- **Endpoint:** `PATCH /api/v1/notifications/:id/read`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Notification marked as read",
+  "data": {
+    "id": "1d2e3f4a-5678-4ec5-b286-d24eef6ff2aa",
+    "user_id": "26d367a0-c964-4958-a9c5-9c2ad422ff8e",
+    "title": "New Task Assigned",
+    "message": "You have been assigned to task 'Setup database migrations' in project 'Task Management API'",
+    "is_read": true,
+    "created_at": "2026-10-27T20:30:00Z"
+  }
+}
+```
+
+### Mark All Notifications as Read
+- **Endpoint:** `PATCH /api/v1/notifications/read-all`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "All notifications marked as read"
 }
 ```
 

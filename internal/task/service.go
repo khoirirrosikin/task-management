@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
+	"github.com/khoirirrosikin/task-management/internal/notification"
 	"github.com/khoirirrosikin/task-management/internal/response"
 )
 
@@ -28,15 +29,25 @@ type ProjectRepository interface {
 	GetProjectMember(ctx context.Context, arg db.GetProjectMemberParams) (db.ProjectMember, error)
 }
 
+type Notifier interface {
+	Enqueue(event notification.Event)
+}
+
 type service struct {
 	repo        Repository
 	projectRepo ProjectRepository
+	notifier    Notifier
 }
 
-func NewService(repo Repository, projectRepo ProjectRepository) Service {
+func NewService(repo Repository, projectRepo ProjectRepository, notifiers ...Notifier) Service {
+	var notifier Notifier
+	if len(notifiers) > 0 {
+		notifier = notifiers[0]
+	}
 	return &service{
 		repo:        repo,
 		projectRepo: projectRepo,
+		notifier:    notifier,
 	}
 }
 
@@ -81,6 +92,17 @@ func (s *service) CreateTask(ctx context.Context, projectID uuid.UUID, userID uu
 	task, err := s.repo.CreateTask(ctx, arg)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create task: %w", err)
+	}
+
+	if task.AssignedTo.Valid {
+		assigneeID := uuid.UUID(task.AssignedTo.Bytes)
+		if assigneeID != userID {
+			s.notify(
+				assigneeID,
+				"New Task Assigned",
+				fmt.Sprintf("You have been assigned to task '%s' in project '%s'", task.Title, project.Name),
+			)
+		}
 	}
 
 	return toTaskResponse(task), nil
@@ -231,6 +253,18 @@ func (s *service) UpdateTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 		return nil, fmt.Errorf("Failed to update task: %w", err)
 	}
 
+	if updated.AssignedTo.Valid{
+		newAssigneeID := uuid.UUID(updated.AssignedTo.Bytes)
+		oldAssigneeID := uuid.UUID(existingTask.AssignedTo.Bytes)
+		if newAssigneeID != userID && (!existingTask.AssignedTo.Valid || newAssigneeID != oldAssigneeID) {
+			s.notify(
+				newAssigneeID,
+				"Task Assigned",
+				fmt.Sprintf("You have been assigned to task '%s' in project '%s'", updated.Title, project.Name),
+			)
+		}
+	}
+
 	return toTaskResponse(updated), nil
 }
 
@@ -247,7 +281,8 @@ func (s *service) DeleteTask(ctx context.Context, taskID uuid.UUID, userID uuid.
 }
 
 func (s *service) AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, req CreateCommentRequest) (*CommentResponse, error) {
-	if _, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID); err != nil {
+	task, _, err := s.getTaskAndVerifyAccess(ctx, taskID, userID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -258,6 +293,17 @@ func (s *service) AddComment(ctx context.Context, taskID uuid.UUID, userID uuid.
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create comment: %w", err)
+	}
+
+	if task.AssignedTo.Valid {
+		assigneeID := uuid.UUID(task.AssignedTo.Bytes)
+		if assigneeID != userID {
+			s.notify(
+				assigneeID,
+				"New Comment on Assigned Task",
+				fmt.Sprintf("A new comment has been added to your task '%s'", task.Title),
+			)
+		}
 	}
 
 	return &CommentResponse{
@@ -424,4 +470,15 @@ func parseDueDate(dueDate *time.Time) pgtype.Timestamptz {
 	}
 
 	return pgtype.Timestamptz{Time: *dueDate, Valid: true}
+}
+
+func (s *service) notify(userID uuid.UUID, title, message string) {
+	if s.notifier == nil {
+		return
+	}
+	s.notifier.Enqueue(notification.Event{
+		UserID: userID,
+		Title: title,
+		Message: message,
+	})
 }

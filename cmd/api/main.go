@@ -16,6 +16,7 @@ import (
 	"github.com/khoirirrosikin/task-management/internal/database"
 	"github.com/khoirirrosikin/task-management/internal/database/db"
 	"github.com/khoirirrosikin/task-management/internal/middleware"
+	"github.com/khoirirrosikin/task-management/internal/notification"
 	"github.com/khoirirrosikin/task-management/internal/project"
 	"github.com/khoirirrosikin/task-management/internal/task"
 )
@@ -40,6 +41,14 @@ func main() {
 
 	queries := db.New(pool)
 
+	workerCtx, cancelWorker := context.WithCancel(ctx)
+	defer cancelWorker()
+
+	notificationRepo := notification.NewRepository(queries)
+	notificationService := notification.NewService(notificationRepo, 100)
+	notificationHandler := notification.NewHandler(notificationService)
+	go notificationService.StartWorker(workerCtx)
+
 	authRepo := auth.NewRepository(queries)
 	authService := auth.NewService(authRepo, jwtSecret)
 	authHandler := auth.NewHandler(authService)
@@ -49,7 +58,7 @@ func main() {
 	projectHandler := project.NewHandler(projectService)
 
 	taskRepo := task.NewRepository(queries)
-	taskService := task.NewService(taskRepo, projectRepo)
+	taskService := task.NewService(taskRepo, projectRepo, notificationService)
 	taskHandler := task.NewHandler(taskService)
 
 	authMiddleware := middleware.AuthMiddleware(jwtSecret)
@@ -64,6 +73,7 @@ func main() {
 	authHandler.RegisterRoutes(v1)
 	projectHandler.RegisterRoutes(v1, authMiddleware)
 	taskHandler.RegisterRoutes(v1, authMiddleware)
+	notificationHandler.RegisterRoutes(v1, authMiddleware)
 
 	srv := &http.Server{
 		Addr: ":" + port,
@@ -81,6 +91,8 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutdown server...")
+
+	cancelWorker()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()

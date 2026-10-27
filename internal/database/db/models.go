@@ -17,6 +17,15 @@ type Comment struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Notification struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Title     string             `json:"title"`
+	Message   string             `json:"message"`
+	IsRead    bool               `json:"is_read"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Project struct {
 	ID          uuid.UUID          `json:"id"`
 	Name        string             `json:"name"`
