@@ -284,6 +284,8 @@ Run unit tests for specific modules:
 go test -v ./internal/auth
 go test -v ./internal/project
 go test -v ./internal/task
+go test -v ./internal/notification
+go test -v ./internal/middleware
 ```
 
 Check test code coverage:
@@ -291,6 +293,8 @@ Check test code coverage:
 go test -cover ./internal/auth
 go test -cover ./internal/project
 go test -cover ./internal/task
+go test -cover ./internal/notification
+go test -cover ./internal/middleware
 ```
 
 ---
